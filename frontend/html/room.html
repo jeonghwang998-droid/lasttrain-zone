@@ -3,16 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#0052A4" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="막차 자기장" />
     <title>모임방 · 막차 자기장</title>
-    <link rel="icon" href="/icons/icon-192.png" />
-    <link rel="stylesheet" href="/css/global.css" />
+    <link rel="manifest" href="../public/manifest.webmanifest" />
+    <link rel="icon" href="../public/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="../public/icons/icon-192.png" />
+    <link rel="stylesheet" href="../css/global.css" />
   </head>
   <body>
     <!-- 모임방: 멤버 순위, 교집합 자기장, 다 같이 일어나기 (room.html?id=방ID) -->
     <main class="page">
       <header class="topbar">
-        <a href="/index.html" class="icon-btn" aria-label="뒤로">←</a>
+        <a href="./join.html" class="icon-btn" aria-label="뒤로">←</a>
         <h1 id="room-title">모임방</h1>
         <span class="room-code" id="room-code"></span>
       </header>
@@ -27,6 +33,6 @@
       </nav>
     </main>
 
-    <script type="module" src="/src/room.js"></script>
+    <script type="module" src="../src/js/room.js"></script>
   </body>
 </html>
