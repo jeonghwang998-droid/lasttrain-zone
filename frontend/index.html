@@ -4,35 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0052A4" />
-    <meta name="description" content="紐⑥엫 以?吏湲??대뵒???덉뼱??吏묒뿉 媛????덈뒗吏 吏?????먭린?μ쑝濡?蹂댁뿬二쇰뒗 洹媛 ?꾩슦誘? />
-    <title>留됱감 ?먭린??/title>
+    <meta name="description" content="모임 중 지금 어디에 있어야 집에 갈 수 있는지 지도 위 자기장으로 보여주는 귀가 도우미" />
+    <title>막차 자기장</title>
 
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <link rel="stylesheet" href="/css/global.css" />
   </head>
   <body>
-    <!-- ?? ??移댁슫?몃떎??+ ???먭린??-->
+    <!-- 홈: 내 카운트다운 + 내 자기장 -->
     <main class="page">
       <header class="topbar">
-        <h1>?쉯 留됱감 ?먭린??/h1>
-        <a href="/html/settings.html" class="icon-btn" aria-label="?ㅼ젙">?숋툘</a>
+        <h1>🚇 막차 자기장</h1>
+        <a href="/html/settings.html" class="icon-btn" aria-label="설정">⚙️</a>
       </header>
 
       <div id="countdown" class="countdown" aria-live="polite">
-        <p class="countdown-label">吏묒뿉 媛?ㅻ㈃ ?쇱뼱?섏빞 ?섎뒗 ?쒓컖源뚯?</p>
+        <p class="countdown-label">집에 가려면 일어나야 하는 시각까지</p>
         <p class="countdown-time" id="countdown-time">--:--:--</p>
-        <p class="countdown-sub" id="countdown-sub">?꾩튂瑜?遺덈윭?ㅻ뒗 以묅?/p>
+        <p class="countdown-sub" id="countdown-sub">위치를 불러오는 중…</p>
       </div>
 
-      <div id="zone-map" class="map" role="img" aria-label="留됱감 ?먭린??吏??></div>
+      <div id="zone-map" class="map" role="img" aria-label="막차 자기장 지도"></div>
 
       <div id="route-card" class="card" hidden></div>
       <div id="taxi-meter" class="card" hidden></div>
 
       <nav class="actions">
-        <a href="/html/join.html" class="btn">珥덈? 肄붾뱶濡??낆옣</a>
-        <button type="button" class="btn btn-primary" id="btn-create-room">紐⑥엫諛?留뚮뱾湲?/button>
+        <a href="/html/join.html" class="btn">초대 코드로 입장</a>
+        <button type="button" class="btn btn-primary" id="btn-create-room">모임방 만들기</button>
       </nav>
     </main>
 
