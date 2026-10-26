@@ -1,0 +1,40 @@
+/* TODO: 디자인 토큰 확정 후 채우기 (라이트/다크 모드) */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #152033;
+  --muted: #5b6778;
+  --line: #dde3ea;
+  --calm: #0052a4;
+  --warn: #b86e00;
+  --danger: #d92d3a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1522;
+    --surface: #162135;
+    --ink: #eef2f7;
+    --muted: #9aa6b6;
+    --line: #27344c;
+    --calm: #5b9bf5;
+    --warn: #f2a93b;
+    --danger: #ff5c68;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 16px 20px 48px;
+}
