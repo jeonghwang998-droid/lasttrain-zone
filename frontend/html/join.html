@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0052A4" />
+    <title>모임방 입장 · 막차 자기장</title>
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="stylesheet" href="/css/global.css" />
+  </head>
+  <body>
+    <!-- 초대 코드 입장 -->
+    <main class="page">
+      <header class="topbar">
+        <a href="/index.html" class="icon-btn" aria-label="뒤로">←</a>
+        <h1>모임방 입장</h1>
+      </header>
+      <form id="join-form" class="form">
+        <label>
+          초대 코드 (6자리)
+          <input type="text" name="code" maxlength="6" inputmode="latin" autocapitalize="characters" required />
+        </label>
+        <button type="submit" class="btn btn-primary">입장</button>
+      </form>
+    </main>
+
+    <script type="module" src="/src/join.js"></script>
+  </body>
+</html>

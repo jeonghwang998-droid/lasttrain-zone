@@ -1,110 +1,41 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#0052A4" />
-    <meta name="description" content="모임 중 지금 어디에 있어야 집에 갈 수 있는지 지도 위 자기장으로 보여주는 귀가 도우미" />
-    <title>막차 자기장</title>
+    <meta name="description" content="紐⑥엫 以?吏湲??대뵒???덉뼱??吏묒뿉 媛????덈뒗吏 吏?????먭린?μ쑝濡?蹂댁뿬二쇰뒗 洹媛 ?꾩슦誘? />
+    <title>留됱감 ?먭린??/title>
 
     <link rel="icon" href="/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-    <link rel="stylesheet" href="/src/styles/global.css" />
+    <link rel="stylesheet" href="/css/global.css" />
   </head>
   <body>
-    <div id="app">
-      <!-- 홈: 내 카운트다운 + 내 자기장 -->
-      <section id="page-home" class="page" data-page="home" hidden>
-        <header class="topbar">
-          <h1>🚇 막차 자기장</h1>
-          <a href="#/settings" class="icon-btn" aria-label="설정">⚙️</a>
-        </header>
+    <!-- ?? ??移댁슫?몃떎??+ ???먭린??-->
+    <main class="page">
+      <header class="topbar">
+        <h1>?쉯 留됱감 ?먭린??/h1>
+        <a href="/html/settings.html" class="icon-btn" aria-label="?ㅼ젙">?숋툘</a>
+      </header>
 
-        <div id="countdown" class="countdown" aria-live="polite">
-          <p class="countdown-label">집에 가려면 일어나야 하는 시각까지</p>
-          <p class="countdown-time" id="countdown-time">--:--:--</p>
-          <p class="countdown-sub" id="countdown-sub">위치를 불러오는 중…</p>
-        </div>
+      <div id="countdown" class="countdown" aria-live="polite">
+        <p class="countdown-label">吏묒뿉 媛?ㅻ㈃ ?쇱뼱?섏빞 ?섎뒗 ?쒓컖源뚯?</p>
+        <p class="countdown-time" id="countdown-time">--:--:--</p>
+        <p class="countdown-sub" id="countdown-sub">?꾩튂瑜?遺덈윭?ㅻ뒗 以묅?/p>
+      </div>
 
-        <div id="zone-map" class="map" role="img" aria-label="막차 자기장 지도"></div>
+      <div id="zone-map" class="map" role="img" aria-label="留됱감 ?먭린??吏??></div>
 
-        <div id="route-card" class="card" hidden></div>
-        <div id="taxi-meter" class="card" hidden></div>
+      <div id="route-card" class="card" hidden></div>
+      <div id="taxi-meter" class="card" hidden></div>
 
-        <nav class="actions">
-          <a href="#/join" class="btn">초대 코드로 입장</a>
-          <button type="button" class="btn btn-primary" id="btn-create-room">모임방 만들기</button>
-        </nav>
-      </section>
+      <nav class="actions">
+        <a href="/html/join.html" class="btn">珥덈? 肄붾뱶濡??낆옣</a>
+        <button type="button" class="btn btn-primary" id="btn-create-room">紐⑥엫諛?留뚮뱾湲?/button>
+      </nav>
+    </main>
 
-      <!-- 온보딩: 집 위치 등록, 알림 권한 -->
-      <section id="page-onboarding" class="page" data-page="onboarding" hidden>
-        <header class="topbar"><h1>시작하기</h1></header>
-        <form id="onboarding-form" class="form">
-          <label>
-            닉네임
-            <input type="text" name="nickname" maxlength="12" required />
-          </label>
-          <label>
-            집 위치
-            <input type="text" name="home" placeholder="가까운 역 또는 주소 검색" required />
-          </label>
-          <button type="button" class="btn" id="btn-push-permission">알림 권한 허용</button>
-          <button type="submit" class="btn btn-primary">완료</button>
-        </form>
-      </section>
-
-      <!-- 초대 코드 입장 -->
-      <section id="page-join" class="page" data-page="join" hidden>
-        <header class="topbar">
-          <a href="#/" class="icon-btn" aria-label="뒤로">←</a>
-          <h1>모임방 입장</h1>
-        </header>
-        <form id="join-form" class="form">
-          <label>
-            초대 코드 (6자리)
-            <input type="text" name="code" maxlength="6" inputmode="latin" autocapitalize="characters" required />
-          </label>
-          <button type="submit" class="btn btn-primary">입장</button>
-        </form>
-      </section>
-
-      <!-- 모임방: 멤버 순위, 교집합 자기장, 다 같이 일어나기 -->
-      <section id="page-room" class="page" data-page="room" hidden>
-        <header class="topbar">
-          <a href="#/" class="icon-btn" aria-label="뒤로">←</a>
-          <h1 id="room-title">모임방</h1>
-          <span class="room-code" id="room-code"></span>
-        </header>
-
-        <div id="call-banner" class="banner" hidden></div>
-        <div id="room-map" class="map" role="img" aria-label="모임 교집합 자기장 지도"></div>
-        <ul id="member-list" class="member-list"></ul>
-
-        <nav class="actions">
-          <button type="button" class="btn" id="btn-arrived">도착했어요</button>
-          <button type="button" class="btn btn-primary" id="btn-call">다 같이 일어나기</button>
-        </nav>
-      </section>
-
-      <!-- 설정: 여유 시간, 보행 기록 -->
-      <section id="page-settings" class="page" data-page="settings" hidden>
-        <header class="topbar">
-          <a href="#/" class="icon-btn" aria-label="뒤로">←</a>
-          <h1>설정</h1>
-        </header>
-        <form id="settings-form" class="form">
-          <label>
-            여유 시간 (분)
-            <input type="number" name="buffer_min" min="0" max="30" value="5" />
-          </label>
-          <p class="hint" id="walk-speed">보행 속도: 기본값 사용 중</p>
-          <button type="submit" class="btn btn-primary">저장</button>
-        </form>
-      </section>
-    </div>
-
-    <!-- Kakao Maps SDK는 src/lib/map-loader.js 에서 키를 읽어 동적으로 로드 -->
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="/src/home.js"></script>
   </body>
 </html>
