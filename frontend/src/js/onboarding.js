@@ -37,7 +37,7 @@ form.addEventListener('submit', (e) => {
   e.preventDefault()
   // TODO: 집 위치를 서버(Supabase user_homes)에 저장
   updateUser({ home: homeEl.value })
-  location.href = url('index.html')
+  location.href = url('html/dashboard.html')
 })
 
 renderPermission()

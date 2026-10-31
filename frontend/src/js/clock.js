@@ -1,6 +1,4 @@
-// 시간 표시와 시연용 시계
-
-import { clock } from './state.js'
+// 시간 표시. 지금 시각은 기기의 실제 시계를 쓴다
 
 // 초 → "HH:MM" (24시간 넘어가면 다음날로 접는다)
 export function hhmm(sec) {
@@ -24,18 +22,20 @@ export function left(r) {
   return h > 0 ? `${h}시간 ${m}분` : `${String(m).padStart(2, '0')}분 ${String(s).padStart(2, '0')}초`
 }
 
-// 지금 시각(초). 새벽 5시 전은 다음날로 본다
-export function nowSec() {
-  if (clock.real) {
-    const d = new Date()
-    const s = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
-    return s < 18000 ? s + 86400 : s
-  }
-  return clock.base + ((performance.now() - clock.t0) / 1000) * clock.speed
+// 서비스 날의 시작(자정)을 ms 로. 새벽 5시 전은 아직 전날 밤으로 본다
+export function serviceDayStart(now = new Date()) {
+  const d = new Date(now)
+  if (d.getHours() < 5) d.setDate(d.getDate() - 1)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
 }
 
-// 지금 시각을 새 기준점으로 삼는다 (배속을 바꾸기 전에 호출)
-export function rebase() {
-  clock.base = nowSec()
-  clock.t0 = performance.now()
+// 지금 시각(초). 새벽 5시 전은 다음날로 본다 (00:30 → 86400+1800)
+export function nowSec(now = new Date()) {
+  return (now.getTime() - serviceDayStart(now)) / 1000
+}
+
+// 서비스 날 기준 초 → 실제 시각(Date)
+export function secToDate(sec, now = new Date()) {
+  return new Date(serviceDayStart(now) + sec * 1000)
 }

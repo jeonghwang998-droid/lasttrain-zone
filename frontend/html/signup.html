@@ -18,7 +18,7 @@
     <main class="page auth">
       <a href="./login.html" class="icon-btn back" aria-label="뒤로">←</a>
 
-      <div class="auth-brand">
+      <div class="auth-brand" id="signup-head">
         <div class="auth-logo" aria-hidden="true">🚇</div>
         <h1>회원가입</h1>
         <p>모임방과 알림을 쓰려면 계정이 필요해요</p>
@@ -49,7 +49,17 @@
         <button type="submit" class="btn btn-primary btn-block">가입하기</button>
       </form>
 
-      <p class="auth-switch">이미 계정이 있나요? <a href="./login.html">로그인</a></p>
+      <p class="auth-switch" id="signup-switch">이미 계정이 있나요? <a href="./login.html">로그인</a></p>
+
+      <!-- 가입 완료 -->
+      <section class="done" id="signup-done" hidden>
+        <div class="done-check" aria-hidden="true">✓</div>
+        <h1>가입이 완료되었어요</h1>
+        <p class="done-email" id="done-email"></p>
+        <p class="done-sub" id="done-confirm" hidden>확인 메일을 보냈어요. 메일의 링크를 누른 뒤 로그인해 주세요.</p>
+        <p class="done-sub">이제 로그인해서 시작해 보세요.</p>
+        <a href="./login.html" id="done-login" class="btn btn-primary btn-block">로그인하러 가기</a>
+      </section>
     </main>
 
     <script type="module" src="../src/js/signup.js"></script>

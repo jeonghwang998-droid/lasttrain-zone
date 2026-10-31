@@ -8,10 +8,12 @@ export default defineConfig({
     open: true, // npm run dev 시 기본 웹브라우저를 자동으로 연다
   },
   build: {
+    target: 'esnext', // 페이지 스크립트가 최상위 await 를 쓴다
     // 페이지마다 HTML 이 따로 있으므로 모두 진입점으로 등록
     rollupOptions: {
       input: {
         index: resolve(__dirname, 'index.html'),
+        dashboard: resolve(__dirname, 'html/dashboard.html'),
         login: resolve(__dirname, 'html/login.html'),
         signup: resolve(__dirname, 'html/signup.html'),
         onboarding: resolve(__dirname, 'html/onboarding.html'),

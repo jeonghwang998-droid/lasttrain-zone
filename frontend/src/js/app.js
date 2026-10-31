@@ -14,7 +14,7 @@ const ICONS = {
 }
 
 const TABS = [
-  { id: 'home', label: '홈', href: 'index.html' },
+  { id: 'home', label: '홈', href: 'html/dashboard.html' },
   { id: 'group', label: '우리 모임', href: 'html/join.html' },
   { id: 'me', label: '내 정보', href: 'html/profile.html' },
 ]

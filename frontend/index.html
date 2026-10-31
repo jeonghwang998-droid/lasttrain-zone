@@ -16,140 +16,81 @@
     <link rel="apple-touch-icon" href="./public/icons/icon-192.png" />
     <link rel="stylesheet" href="./css/global.css" />
   </head>
-  <body data-level="calm" data-tab="home">
-    <!-- 출발 알림 토스트 -->
-    <div class="toast" id="toast" role="alert">
-      <span id="toastText"></span>
-      <button type="button" id="toastClose">닫기</button>
-    </div>
-
-    <main class="page">
+  <body>
+    <main class="page landing">
       <header class="topbar">
         <h1>🚇 막차 자기장</h1>
-        <div class="auth-area" id="authArea"></div>
+        <div class="auth-area">
+          <a href="./html/login.html" class="btn btn-sm">로그인</a>
+          <a href="./html/signup.html" class="btn btn-sm btn-primary">회원가입</a>
+        </div>
       </header>
 
-      <div class="seg" role="group" aria-label="보기 전환">
-        <button type="button" id="tab-me" aria-pressed="true">나</button>
-        <button type="button" id="tab-group" aria-pressed="false">우리 테이블</button>
-        <button type="button" id="tab-walk" aria-pressed="false">내 걸음</button>
-      </div>
-
-      <!-- 나: 내 막차 역산 -->
-      <div id="view-me" class="view">
-        <div class="panel hero">
-          <div class="hero-top">
-            <p class="lead" id="heroLead">이때 일어나면 막차 탑니다</p>
-            <span class="clock">지금 <span id="clock">--:--</span></span>
-          </div>
-          <div class="big" id="heroTime">--:--</div>
-          <p class="count" id="heroCount"></p>
-          <p class="diff" id="diff" hidden></p>
-
-          <div class="track" aria-hidden="true">
-            <div class="rail"></div>
-            <div class="done" id="done"></div>
-            <div class="stop"></div>
-            <div class="train" id="train"></div>
-          </div>
-          <div class="tracklabels"><span>1시간 전</span><span>출발 마지노선</span></div>
+      <section class="landing-hero">
+        <div class="auth-logo" aria-hidden="true">🚇</div>
+        <h2>놀다가 막차 놓치는 일,<br />이제 그만</h2>
+        <p>
+          모임 중 <strong>지금 어디에 있어야 집에 갈 수 있는지</strong>를<br />
+          지도 위 자기장으로 보여주는 귀가 도우미예요.
+        </p>
+        <div class="landing-cta">
+          <a href="./html/signup.html" class="btn btn-primary btn-block">무료로 시작하기</a>
+          <a href="./html/login.html" class="btn btn-block">이미 계정이 있어요</a>
         </div>
+      </section>
 
-        <section class="panel">
-          <h2>오늘 밤 상황</h2>
-          <div class="ai-switch">
+      <section class="panel">
+        <h2>이런 걸 해줘요</h2>
+        <ul class="feature-list">
+          <li>
+            <span class="feature-ico" aria-hidden="true">⏰</span>
+            <div>
+              <div class="t">막차 시각 역산</div>
+              <div class="s">“이때 일어나면 막차 탑니다”를 현재 위치와 집 기준으로 계산해요.</div>
+            </div>
+          </li>
+          <li>
+            <span class="feature-ico" aria-hidden="true">🧲</span>
+            <div>
+              <div class="t">귀가 자기장</div>
+              <div class="s">지도 위에 집에 갈 수 있는 구역을 보여주고, 시간이 지나면 점점 좁혀져요.</div>
+            </div>
+          </li>
+          <li>
+            <span class="feature-ico" aria-hidden="true">👥</span>
+            <div>
+              <div class="t">우리 테이블</div>
+              <div class="s">모임에서 누가 먼저 일어나야 하는지 한눈에 확인해요.</div>
+            </div>
+          </li>
+          <li>
+            <span class="feature-ico" aria-hidden="true">🤖</span>
             <div>
               <div class="t">AI 지연 보정</div>
-              <div class="s">지연 예측 모델과 내 걸음 속도를 반영해요</div>
+              <div class="s">지연 예측 모델과 내 걸음 속도를 반영해 더 정확하게 알려드려요.</div>
             </div>
-            <button type="button" class="toggle" id="ai" aria-pressed="true" aria-label="AI 지연 보정"></button>
-          </div>
-          <div class="field">
-            <label for="wd">요일</label>
-            <select id="wd"></select>
-          </div>
-          <div class="field">
-            <label for="rain">비</label>
+          </li>
+          <li>
+            <span class="feature-ico" aria-hidden="true">🔔</span>
             <div>
-              <input type="range" id="rain" min="0" max="30" step="1" value="0" />
-              <div class="rangeval" id="rainVal"></div>
+              <div class="t">출발 알림</div>
+              <div class="s">30분 전, 10분 전, 출발 시각에 알림으로 챙겨드려요.</div>
             </div>
-          </div>
-        </section>
+          </li>
+        </ul>
+      </section>
 
-        <section class="panel">
-          <h2>어디서 어디로</h2>
-          <div class="field">
-            <label for="from">지금 있는 곳</label>
-            <select id="from"></select>
-          </div>
-          <div class="field">
-            <label for="home">집</label>
-            <select id="home"></select>
-          </div>
-          <div class="field">
-            <label for="buffer">여유 시간</label>
-            <div>
-              <input type="range" id="buffer" min="0" max="20" step="1" value="5" />
-              <div class="rangeval" id="bufferVal"></div>
-            </div>
-          </div>
-        </section>
+      <section class="panel">
+        <h2>사용 방법</h2>
+        <ol class="steps-list">
+          <li><b>회원가입</b> 닉네임과 이메일로 가입해요.</li>
+          <li><b>집 위치 등록</b> 집이 어디인지 한 번만 알려주세요. 다른 멤버에게는 공개되지 않아요.</li>
+          <li><b>대시보드 확인</b> 지금 일어나야 하는 시각과 탈 수 있는 막차를 바로 볼 수 있어요.</li>
+        </ol>
+      </section>
 
-        <section class="panel">
-          <h2>탈 수 있는 막차</h2>
-          <ul class="routes" id="routes"></ul>
-        </section>
-      </div>
-
-      <!-- 우리 테이블: 누가 먼저 일어나야 하나 -->
-      <div id="view-group" class="view" hidden>
-        <section class="panel">
-          <h2>누가 먼저 일어나야 할까</h2>
-          <ul class="people" id="people"></ul>
-          <div class="add">
-            <input type="text" id="fname" placeholder="이름" maxlength="10" aria-label="친구 이름" />
-            <select id="fhome" aria-label="친구 집"></select>
-            <button type="button" class="btn btn-primary" id="fadd">추가</button>
-          </div>
-          <p class="err" id="ferr"></p>
-        </section>
-      </div>
-
-      <!-- 내 걸음: 보행 속도 학습 -->
-      <div id="view-walk" class="view" hidden>
-        <section class="panel">
-          <h2>내 걸음 속도</h2>
-          <div class="speed" id="speed">75<small>m/분</small></div>
-          <p class="formula" id="formula"></p>
-          <ul class="trips" id="trips"></ul>
-          <div class="add">
-            <input type="number" id="tdist" placeholder="거리 m" min="1" inputmode="numeric" aria-label="걸은 거리(미터)" />
-            <input type="number" id="tmin" placeholder="걸린 분" min="1" step="0.1" inputmode="decimal" aria-label="걸린 시간(분)" />
-            <button type="button" class="btn btn-primary" id="tadd">기록</button>
-          </div>
-          <p class="err" id="terr"></p>
-          <button type="button" class="btn" id="tsample">예시 기록 넣기</button>
-          <p class="note">실제 앱에서는 출발 알림을 누른 위치부터 역에 들어선 순간까지를 자동으로 기록해요. 너무 느리거나 빠른 기록은 편의점에 들렀거나 택시를 탄 것으로 보고 빼요.</p>
-        </section>
-      </div>
-
-      <!-- 시연용 시계 -->
-      <div class="demo">
-        <h2>시연용 시계</h2>
-        <div class="row">
-          <input type="time" id="start" value="22:00" aria-label="시작 시각" />
-          <div class="seg" role="group" aria-label="시간 속도">
-            <button type="button" id="sp1" aria-pressed="true">실시간</button>
-            <button type="button" id="sp60" aria-pressed="false">1초에 1분</button>
-            <button type="button" id="spReal" aria-pressed="false">실제 시각</button>
-          </div>
-        </div>
-        <p class="note">시간표는 시연용 가짜 데이터예요. 지연 예측값은 학습한 모델(q90)의 결과를 표로 뽑아 넣었어요.</p>
-      </div>
-
+      <p class="note landing-foot">시간표는 시연용 가짜 데이터예요.</p>
     </main>
 
-    <script type="module" src="./src/js/index.js"></script>
   </body>
 </html>

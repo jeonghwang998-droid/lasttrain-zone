@@ -1,6 +1,6 @@
 // 핵심 계산: 지연 예측 조회, 보행 속도 추정, 막차 역산
 
-import { Q90, RAIN_BINS, HOUR_IDX, ROUTES } from './data.js'
+import { Q90, RAIN_BINS, HOUR_IDX } from './data.js'
 import { S } from './state.js'
 
 // 학습된 q90 예측표에서 지연(분)을 읽는다. 강수량은 구간 사이를 선형 보간
@@ -26,24 +26,6 @@ function lateFor(leg, dep) {
   if (!leg.line) return 0
   const hour = Math.floor((dep + leg.ride) / 60) % 24
   return Math.round(Math.min(Math.max(q90(leg.line, hour, S.wd, S.rain), 0), 15))
-}
-
-/* ---------- 보행 속도: 베이지안 축소 추정 ---------- */
-export const PRIOR = 75 // 전체 평균(m/분)
-const K = 5 // 전체 평균에 주는 가상 기록 수
-export const VALID = [35, 140] // 이 범위를 벗어난 기록(편의점, 택시 등)은 제외
-
-function median(a) {
-  const s = a.slice().sort((x, y) => x - y)
-  const n = s.length
-  return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2
-}
-
-export function speedInfo() {
-  const ok = S.trips.map((t) => t.d / t.m).filter((v) => v >= VALID[0] && v <= VALID[1])
-  if (!ok.length) return { speed: PRIOR, n: 0, mine: null }
-  const mine = median(ok)
-  return { speed: (PRIOR * K + mine * ok.length) / (K + ok.length), n: ok.length, mine }
 }
 
 /* ---------- 막차 역산 ---------- */
@@ -75,14 +57,14 @@ export function planRoute(route, useAI) {
     out.unshift({ leg, dep: pick, late, raw })
     deadline = pick
   }
-  const speed = useAI ? speedInfo().speed : PRIOR
+  const speed = (useAI ? S.walkSpeed : S.walkDefault) || S.walkDefault || 1
   const walk = Math.max(1, Math.ceil(route.walkM / speed))
   return { route, legs: out, walk, leave: (out[0].dep - walk - S.buffer) * 60 }
 }
 
-// 현재 출발지에서 home 까지 탈 수 있는 경로들 (늦게 출발 가능한 순)
-export function plansFor(home, useAI) {
-  return (ROUTES[S.from + '|' + home] || [])
+// 가져온 경로들 중 탈 수 있는 것만, 늦게 출발 가능한 순으로
+export function plansFor(routes, useAI) {
+  return routes
     .map((r) => planRoute(r, useAI))
     .filter(Boolean)
     .sort((a, b) => b.leave - a.leave)

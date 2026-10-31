@@ -109,17 +109,23 @@ const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
 $('iosHint').hidden = !(isIos && !isStandalone)
 
 /* ---------- 로그아웃 / 탈퇴 ---------- */
-$('logoutBtn').addEventListener('click', () => {
+$('logoutBtn').addEventListener('click', async () => {
   if (!confirm('로그아웃할까요?')) return
-  logout()
+  await logout()
   location.href = url('index.html')
 })
 
-$('withdrawBtn').addEventListener('click', () => {
-  const ok = confirm('정말 탈퇴할까요?\n내 정보와 설정이 모두 삭제되고 되돌릴 수 없어요.')
+$('withdrawBtn').addEventListener('click', async () => {
+  const ok = confirm('정말 탈퇴할까요?\n내 계정과 정보가 모두 삭제되고 되돌릴 수 없어요.')
   if (!ok) return
-  // TODO: 서버 계정과 데이터도 삭제
-  withdraw()
+  const btn = $('withdrawBtn')
+  btn.disabled = true
+  const res = await withdraw()
+  if (res.error) {
+    btn.disabled = false
+    toast(res.error)
+    return
+  }
   location.href = url('index.html')
 })
 

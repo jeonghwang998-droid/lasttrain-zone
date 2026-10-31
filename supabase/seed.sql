@@ -1,2 +1,0 @@
--- 시연용 데이터
--- TODO: 테스트 계정 가입 후 해당 user id 로 user_homes, rooms, room_members 채우기

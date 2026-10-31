@@ -229,11 +229,6 @@ lasttrain-zone/
 │   ├── data/                   # (gitignore) 수집 데이터
 │   └── models/                 # 학습 결과 → backend로 복사
 │
-├── supabase/
-│   ├── migrations/
-│   │   └── 001_init.sql        # 테이블 + RLS 정책
-│   └── seed.sql                # 시연용 데이터
-│
 └── docs/
     ├── api.md                  # 상세 API 명세
     └── presentation/           # 발표 자료, 시연 영상
@@ -572,7 +567,7 @@ REDIS_URL=redis://redis:6379/0
 cp .env.example .env    # 값 채우기
 
 # 2. DB 스키마
-#    Supabase 대시보드 → SQL Editor → supabase/migrations/001_init.sql 실행
+#    DB 스키마와 함수는 Supabase 대시보드에서 직접 관리한다 (이 저장소에 SQL 파일은 없다)
 
 # 3. 백엔드 + Redis + 알림 워커
 docker compose up --build
@@ -609,7 +604,7 @@ cp models/delay_model.joblib ../backend/app/ml/models/
 
 | 주차 | 목표 | 산출물 |
 |---|---|---|
-| 9주차 | 레포, 환경 세팅 / DB 스키마 / 역, 시간표 데이터 적재 / **ML 데이터 수집 시작** | 001_init.sql, stations.csv, collect.py 상시 실행 |
+| 9주차 | 레포, 환경 세팅 / DB 스키마 / 역, 시간표 데이터 적재 / **ML 데이터 수집 시작** | stations.csv, collect.py 상시 실행 |
 | 10주차 | 막차 역산 API + 홈 화면 카운트다운 | `/api/plan`, HomePage |
 | 11주차 | 역방향 탐색 + **자기장 지도** | `/api/zone`, ZoneMap |
 | 12주차 | 모임방, Realtime 멤버 순위, 웹 푸시, **다 같이 일어나기 콜** | `/api/rooms/*`, worker.py |

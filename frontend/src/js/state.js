@@ -1,31 +1,12 @@
-// 화면 전체가 공유하는 상태
-
-import { toMin, HOMES } from './data.js'
-import { getUser, getPrefs } from './account.js'
-
-const user = getUser()
+// 대시보드 화면이 공유하는 상태. 값은 모두 서버(Supabase)와 현재 시각에서 채운다
 
 export const S = {
-  from: 'sinbu',
-  home: user && HOMES[user.home] ? user.home : 'ansan', // 내 정보에서 정한 집
-  buffer: getPrefs().buffer, // 여유 시간(분)
   ai: true, // AI 지연 보정 사용 여부
-  wd: 4, // 요일 (0=월)
-  rain: 8, // 시간당 강수량(mm)
-  friends: [
-    { id: 1, name: '민수', home: 'suwon' },
-    { id: 2, name: '지은', home: 'sillim' },
-  ],
-  nextId: 3,
-  trips: [], // 보행 기록 [{ d: 거리m, m: 분 }]
+  wd: (new Date().getDay() + 6) % 7, // 오늘 요일 (0=월)
+  rain: 0, // 시간당 강수량(mm). 날씨 데이터가 연결되기 전까지는 직접 입력
+  buffer: 0, // 여유 시간(분): profiles.buffer_min
+  walkSpeed: 0, // 내 보행 속도(m/분): profiles.walk_speed
+  walkDefault: 0, // 전체 평균 보행 속도: app_config walk_speed.default
+  routes: [], // 탈 수 있는 경로 (transit.js)
   fired: {}, // 이미 울린 알림
-}
-
-// 시연용 시계: base(초) 에서 시작해 speed 배속으로 흐른다. real 이면 실제 시각
-export const clock = {
-  base: toMin('22:00') * 60,
-  t0: performance.now(),
-  speed: 1,
-  real: false,
-  wasReal: false,
 }

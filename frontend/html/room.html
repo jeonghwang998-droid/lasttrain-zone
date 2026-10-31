@@ -15,24 +15,6 @@
     <link rel="stylesheet" href="../css/global.css" />
   </head>
   <body>
-    <!-- 모임방: 멤버 순위, 교집합 자기장, 다 같이 일어나기 (room.html?id=방ID) -->
-    <main class="page">
-      <header class="topbar">
-        <a href="./join.html" class="icon-btn" aria-label="뒤로">←</a>
-        <h1 id="room-title">모임방</h1>
-        <span class="room-code" id="room-code"></span>
-      </header>
-
-      <div id="call-banner" class="banner" hidden></div>
-      <div id="room-map" class="map" role="img" aria-label="모임 교집합 자기장 지도"></div>
-      <ul id="member-list" class="member-list"></ul>
-
-      <nav class="actions">
-        <button type="button" class="btn" id="btn-arrived">도착했어요</button>
-        <button type="button" class="btn btn-primary" id="btn-call">다 같이 일어나기</button>
-      </nav>
-    </main>
-
     <script type="module" src="../src/js/room.js"></script>
   </body>
 </html>

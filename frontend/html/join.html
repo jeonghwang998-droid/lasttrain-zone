@@ -24,7 +24,7 @@
       <section class="panel login-prompt" id="guest" hidden>
         <div class="auth-logo" aria-hidden="true">👥</div>
         <h2>모임은 로그인 후에 쓸 수 있어요</h2>
-        <p class="hint">친구들과 모임방을 만들면 가장 먼저 일어나야 하는 사람에 맞춰 모두에게 알림이 가요.</p>
+        <p class="hint" id="guest-hint">친구들과 모임방을 만들면 가장 먼저 일어나야 하는 사람에 맞춰 모두에게 알림이 가요.</p>
         <div class="actions">
           <a href="./login.html" class="btn">로그인</a>
           <a href="./signup.html" class="btn btn-primary">회원가입</a>
@@ -38,12 +38,17 @@
             <input type="text" name="code" maxlength="6" inputmode="latin" autocapitalize="characters" autocomplete="off" placeholder="초대 코드 6자리" aria-label="초대 코드" required />
             <button type="submit" class="btn btn-primary btn-block">입장</button>
           </form>
+          <p class="err" id="join-error" role="alert"></p>
         </section>
 
         <section class="panel">
           <h2>새 모임방</h2>
           <p class="hint">방을 만들면 초대 코드가 생겨요. 친구에게 코드를 알려주세요.</p>
-          <button type="button" class="btn btn-block" id="btn-create-room">모임방 만들기</button>
+          <div class="stack">
+            <input type="text" id="place-input" maxlength="40" placeholder="모임 이름이나 장소 (선택)" aria-label="모임 이름이나 장소" />
+            <button type="button" class="btn btn-block" id="btn-create-room">모임방 만들기</button>
+          </div>
+          <p class="err" id="create-error" role="alert"></p>
         </section>
       </div>
     </main>
