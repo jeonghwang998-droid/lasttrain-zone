@@ -23,3 +23,6 @@ ml/data/*
 .DS_Store
 Thumbs.db
 .idea/
+
+# 받아 둔 지하철 노선/역 목록
+backend/data/subway_catalog.json

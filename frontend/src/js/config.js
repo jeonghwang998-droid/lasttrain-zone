@@ -5,3 +5,11 @@
 export const SUPABASE_URL = 'https://jnoitxgcpncsfvuaqjls.supabase.co'
 export const SUPABASE_ANON_KEY =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impub2l0eGdjcG5jc2Z2dWFxamxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNDQ1OTksImV4cCI6MjEwODgyMDU5OX0.t2rWMAoPdilkSFx1FVI0-sUzPNpvDADJezdoR9KYj2g'
+
+// Flask 백엔드 주소. 로컬에서는 backend/wsgi.py 가 5000 번에서 돈다. 배포하면 그 주소로 바꾼다
+// Flask 가 화면까지 내주는 주소(5000 번)로 열었으면 같은 주소로 부른다
+export const API_BASE_URL = location.port === '5000' ? '' : 'http://localhost:5000'
+
+// 카카오 JavaScript 키 (developers.kakao.com > 앱 키). 장소 검색 자동완성에 쓴다.
+// 브라우저에 공개되는 키이고 등록한 도메인에서만 동작한다. 비워 두면 자동완성만 꺼진다
+export const KAKAO_JS_KEY = 'aac527eabec3aff77c3deb0b913204b9'

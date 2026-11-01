@@ -35,106 +35,195 @@
         <button type="button" id="tab-walk" aria-pressed="false">내 걸음</button>
       </div>
 
-      <!-- 나: 내 막차 역산 -->
+      <!-- 나: 어디에서 어디까지 + 내 막차 역산 -->
       <div id="view-me" class="view">
-        <div class="panel hero">
-          <div class="hero-top">
-            <p class="lead" id="heroLead">막차 정보를 불러오는 중이에요</p>
-            <span class="clock">지금 <span id="clock">--:--</span></span>
+        <!-- 등록해 둔 경로: 고르면 아래에 오늘 밤 막차가 나온다 -->
+        <section class="panel" id="route-list-panel" hidden>
+          <div class="panel-head">
+            <h2>내 막차 경로</h2>
+            <button type="button" class="btn btn-sm" id="routeAdd">+ 경로 등록</button>
           </div>
-          <div class="big" id="heroTime">--:--</div>
-          <p class="count" id="heroCount"></p>
-          <p class="diff" id="diff" hidden></p>
+          <ul class="my-routes" id="myRoutes"></ul>
+        </section>
 
-          <div class="track" aria-hidden="true">
-            <div class="rail"></div>
-            <div class="done" id="done"></div>
-            <div class="stop"></div>
-            <div class="train" id="train"></div>
+        <!-- 등록하기: 어디에서 어디까지 -->
+        <section class="panel trip-ask" id="trip-ask">
+          <h2 id="tripTitle">어디에서 어디까지 갈까요?</h2>
+          <p class="trip-sub">자주 타는 경로를 등록해 두면 오늘 밤 탈 수 있는 막차를 환승까지 계산해요.</p>
+          <form id="trip-form" novalidate>
+            <div class="trip-fields">
+              <div class="trip-dots" aria-hidden="true"><i class="dot from"></i><i class="bar"></i><i class="dot to"></i></div>
+              <div class="trip-inputs">
+                <div class="place">
+                  <input type="text" id="fromInput" maxlength="40" autocomplete="off" placeholder="출발지 (역 이름이나 장소)" aria-label="출발지" />
+                  <ul class="suggest" id="fromSuggest" hidden></ul>
+                </div>
+                <div class="place">
+                  <input type="text" id="toInput" maxlength="40" autocomplete="off" placeholder="도착지 (집이나 내릴 역)" aria-label="도착지" />
+                  <ul class="suggest" id="toSuggest" hidden></ul>
+                </div>
+              </div>
+              <button type="button" class="swap" id="swapBtn" aria-label="출발지와 도착지 바꾸기">⇅</button>
+            </div>
+            <div class="station-pick">
+              <div class="sp-head">
+                <span class="sp-title">지하철역으로 고르기</span>
+                <div class="sp-target" role="group" aria-label="고를 대상">
+                  <button type="button" id="spFrom" aria-pressed="true">출발</button>
+                  <button type="button" id="spTo" aria-pressed="false">도착</button>
+                </div>
+              </div>
+              <div class="sp-selects">
+                <select id="spLine" aria-label="노선"><option value="">노선 선택</option></select>
+                <select id="spStation" aria-label="역" disabled><option value="">역 선택</option></select>
+              </div>
+              <p class="sp-msg" id="spMsg" role="status"></p>
+              <button type="button" class="btn btn-sm" id="spRetry" hidden>다시 불러오기</button>
+              <div class="sp-info" id="spInfo" hidden></div>
+            </div>
+            <input type="text" id="labelInput" class="label-input" maxlength="20" autocomplete="off" placeholder="경로 이름 (선택)" aria-label="경로 이름" />
+            <div class="btn-row two">
+              <button type="submit" class="btn btn-primary" id="tripSubmit">등록하기</button>
+              <button type="button" class="btn" id="tripCancel" hidden>취소</button>
+            </div>
+            <p class="err" id="tripErr" role="alert"></p>
+          </form>
+        </section>
+
+        <div id="trip-result" class="stack-lg" hidden>
+          <div class="panel hero">
+            <div class="hero-top">
+              <p class="lead" id="heroLead">막차 정보를 불러오는 중이에요</p>
+              <span class="clock">지금 <span id="clock">--:--</span></span>
+            </div>
+            <div class="big" id="heroTime">--:--</div>
+            <p class="count" id="heroCount"></p>
+            <p class="diff" id="diff" hidden></p>
+
+            <div class="track" aria-hidden="true">
+              <div class="rail"></div>
+              <div class="done" id="done"></div>
+              <div class="stop"></div>
+              <div class="train" id="train"></div>
+            </div>
+            <div class="tracklabels"><span>1시간 전</span><span>출발 마지노선</span></div>
           </div>
-          <div class="tracklabels"><span>1시간 전</span><span>출발 마지노선</span></div>
+
+
+          <section class="panel" id="lastPanel" hidden>
+            <h2>출발역 막차</h2>
+            <div class="sp-info" id="lastBody"></div>
+            <p class="note">공공데이터포털 시간표 기준이에요. 실제 운행과 다를 수 있어요.</p>
+          </section>
+
+          <section class="panel">
+            <h2>오늘 밤 상황</h2>
+            <div class="ai-switch">
+              <div>
+                <div class="t">AI 지연 보정</div>
+                <div class="s">지연 예측 모델과 내 걸음 속도를 반영해요</div>
+              </div>
+              <button type="button" class="toggle" id="ai" aria-pressed="true" aria-label="AI 지연 보정"></button>
+            </div>
+            <div class="field">
+              <label>오늘</label>
+              <div id="todayWd"></div>
+            </div>
+            <div class="field">
+              <label for="rain">지금 비</label>
+              <div>
+                <input type="range" id="rain" min="0" max="30" step="1" value="0" />
+                <div class="rangeval" id="rainVal"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>출발 설정</h2>
+            <div class="field">
+              <label for="buffer">여유 시간</label>
+              <div>
+                <input type="range" id="buffer" min="0" max="30" step="1" value="0" />
+                <div class="rangeval" id="bufferVal"></div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h2>탈 수 있는 막차</h2>
+            <ul class="routes" id="routes"></ul>
+          </section>
         </div>
-
-        <section class="panel">
-          <h2>오늘 밤 상황</h2>
-          <div class="ai-switch">
-            <div>
-              <div class="t">AI 지연 보정</div>
-              <div class="s">지연 예측 모델과 내 걸음 속도를 반영해요</div>
-            </div>
-            <button type="button" class="toggle" id="ai" aria-pressed="true" aria-label="AI 지연 보정"></button>
-          </div>
-          <div class="field">
-            <label>오늘</label>
-            <div id="todayWd"></div>
-          </div>
-          <div class="field">
-            <label for="rain">지금 비</label>
-            <div>
-              <input type="range" id="rain" min="0" max="30" step="1" value="0" />
-              <div class="rangeval" id="rainVal"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2>출발 설정</h2>
-          <div class="field">
-            <label for="buffer">여유 시간</label>
-            <div>
-              <input type="range" id="buffer" min="0" max="30" step="1" value="0" />
-              <div class="rangeval" id="bufferVal"></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <h2>탈 수 있는 막차</h2>
-          <ul class="routes" id="routes"></ul>
-        </section>
       </div>
 
       <!-- 우리 테이블: 모임방과 멤버 -->
       <div id="view-group" class="view" hidden>
-        <section class="panel" id="group-empty" hidden>
-          <h2>우리 테이블</h2>
-          <p class="empty">아직 모임이 없어요. 새 모임을 만들거나 초대 코드로 들어가 보세요.</p>
-        </section>
+        <!-- 모임 목록: 내가 들어가 있는 모임(채널)과 새 모임을 만드는 곳 -->
+        <div id="group-list">
+          <section class="panel" id="channel-panel" hidden>
+            <h2>내 모임</h2>
+            <ul class="channels" id="channels"></ul>
+          </section>
 
-        <section class="panel" id="group-room" hidden>
-          <div class="room-head">
-            <div>
-              <h2 id="roomName">모임</h2>
-              <button type="button" class="code-chip" id="roomCode" aria-label="초대 코드 복사"></button>
+          <section class="panel">
+            <h2>새 모임 만들기</h2>
+            <form id="create-form" class="stack" novalidate>
+              <input type="text" id="placeInput" maxlength="40" placeholder="모임 이름" aria-label="모임 이름" />
+              <div class="code-result" id="genResult" hidden>
+                <span class="code-chip" id="genCode"></span>
+                <span class="note">이 코드를 받은 친구가 입장하면 같은 모임이 열려요.</span>
+              </div>
+              <div class="btn-row two">
+                <button type="submit" class="btn btn-primary">모임 만들기</button>
+                <button type="button" class="btn" id="shareBtn" disabled>코드 공유하기</button>
+              </div>
+            </form>
+            <p class="err" id="genErr" role="alert"></p>
+          </section>
+
+          <section class="panel">
+            <h2>초대 코드로 입장</h2>
+            <form id="join-form" class="stack" novalidate>
+              <input type="text" id="codeInput" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="초대 코드 6자리" aria-label="초대 코드" />
+              <button type="submit" class="btn btn-block">입장</button>
+            </form>
+            <p class="err" id="groupErr" role="alert"></p>
+          </section>
+        </div>
+
+        <!-- 모임 안: 모임 이름, 내 막차 입력, 멤버들의 막차 -->
+        <div id="group-room" hidden>
+          <section class="panel">
+            <div class="room-head">
+              <h2 id="roomName"></h2>
+              <button type="button" class="btn btn-sm" id="btnBack">모임 목록</button>
             </div>
-            <select id="roomSelect" aria-label="모임 선택" hidden></select>
-          </div>
-          <ul class="people" id="people"></ul>
-          <div class="btn-row">
-            <button type="button" class="btn btn-primary" id="inviteBtn">멤버 초대하기</button>
-            <button type="button" class="btn" id="btnLeaving">출발했어요</button>
-            <button type="button" class="btn" id="btnArrived">도착했어요</button>
-          </div>
+
+            <form id="lt-form" class="stack" novalidate>
+              <div class="seg" role="group" aria-label="교통수단">
+                <button type="button" id="mode-subway" aria-pressed="true">지하철</button>
+                <button type="button" id="mode-bus" aria-pressed="false">버스</button>
+              </div>
+              <input type="text" id="ltLabel" maxlength="40" placeholder="노선이나 정류장 (선택)" aria-label="노선이나 정류장" />
+              <label class="time-field">
+                <span>막차 시각</span>
+                <input type="time" id="ltTime" aria-label="막차 시각" />
+              </label>
+              <div class="btn-row two">
+                <button type="submit" class="btn btn-primary">막차 저장</button>
+                <button type="button" class="btn" id="ltClear" hidden>입력 지우기</button>
+              </div>
+            </form>
+            <p class="err" id="roomErr" role="alert"></p>
+          </section>
+
+          <section class="panel">
+            <h2>멤버의 막차</h2>
+            <ul class="people" id="people"></ul>
+          </section>
+
           <button type="button" class="btn btn-danger btn-block" id="btnLeave">모임 나가기</button>
-          <p class="err" id="roomErr" role="alert"></p>
-        </section>
-
-        <section class="panel">
-          <h2>새 모임 만들기</h2>
-          <form id="create-form" class="stack" novalidate>
-            <input type="text" id="placeInput" maxlength="40" placeholder="모임 이름이나 장소 (선택)" aria-label="모임 이름이나 장소" />
-            <button type="submit" class="btn btn-block">모임 만들기</button>
-          </form>
-        </section>
-
-        <section class="panel">
-          <h2>초대 코드로 입장</h2>
-          <form id="join-form" class="stack" novalidate>
-            <input type="text" id="codeInput" maxlength="6" autocapitalize="characters" autocomplete="off" placeholder="초대 코드 6자리" aria-label="초대 코드" />
-            <button type="submit" class="btn btn-block">입장</button>
-          </form>
-          <p class="err" id="groupErr" role="alert"></p>
-        </section>
+        </div>
       </div>
 
       <!-- 내 걸음: 보행 속도 학습 -->

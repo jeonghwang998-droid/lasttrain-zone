@@ -9,7 +9,7 @@ export function roomError(error) {
   console.error('[rooms]', error)
   const msg = (error && error.message) || ''
   if (/[가-힣]/.test(msg)) return msg
-  if (error && (error.code === 'PGRST202' || /function .* does not exist|schema cache/i.test(msg))) {
+  if (error && (error.code === 'PGRST202' || error.code === 'PGRST205' || /function .* does not exist|schema cache/i.test(msg))) {
     return '모임 기능이 아직 준비되지 않았어요. 관리자에게 알려 주세요.'
   }
   return '처리하지 못했어요. 잠시 후 다시 시도해 주세요.'
@@ -61,27 +61,48 @@ export async function leaveRoom(roomId) {
   if (error) throw error
 }
 
-export async function setMyStatus(roomId, uid, status) {
-  const { error } = await supabase.from('room_members').update({ status }).eq('room_id', roomId).eq('user_id', uid)
-  if (error) throw error
-}
-
-export async function setMyLeaveAt(roomId, uid, date) {
-  const { error } = await supabase
-    .from('room_members')
-    .update({ leave_at: date ? date.toISOString() : null })
+// 모임 안에서 멤버들이 입력한 막차 (room_last_trains). 시각은 'HH:MM:SS' 문자열로 온다
+export async function roomLastTrains(roomId) {
+  const { data, error } = await supabase
+    .from('room_last_trains')
+    .select('user_id, mode, line_label, last_time')
     .eq('room_id', roomId)
-    .eq('user_id', uid)
+  if (error) throw error
+  return data.map((t) => ({
+    userId: t.user_id,
+    mode: t.mode, // 'subway' | 'bus'
+    label: t.line_label || '',
+    time: (t.last_time || '').slice(0, 5), // 'HH:MM'
+  }))
+}
+
+// 내 막차를 저장한다. 모임마다 한 줄이라 다시 저장하면 덮어쓴다
+export async function saveLastTrain(roomId, uid, { mode, label, time }) {
+  const { error } = await supabase
+    .from('room_last_trains')
+    .upsert(
+      { room_id: roomId, user_id: uid, mode, line_label: label, last_time: time, updated_at: new Date().toISOString() },
+      { onConflict: 'room_id,user_id' },
+    )
   if (error) throw error
 }
 
-// 멤버가 바뀌면 callback 을 부른다. 반환값을 호출하면 구독을 끊는다
+export async function clearLastTrain(roomId, uid) {
+  const { error } = await supabase.from('room_last_trains').delete().eq('room_id', roomId).eq('user_id', uid)
+  if (error) throw error
+}
+
+// 멤버나 막차가 바뀌면 callback 을 부른다. 반환값을 호출하면 구독을 끊는다
+// 막차 테이블이 아직 없어도 멤버 구독이 영향받지 않도록 채널을 따로 연다
 export function watchRoom(roomId, callback) {
-  const channel = supabase
-    .channel(`room-${roomId}`)
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: `room_id=eq.${roomId}` }, callback)
-    .subscribe()
-  return () => supabase.removeChannel(channel)
+  const tables = ['room_members', 'room_last_trains']
+  const channels = tables.map((table) =>
+    supabase
+      .channel(`room-${table}-${roomId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table, filter: `room_id=eq.${roomId}` }, callback)
+      .subscribe(),
+  )
+  return () => channels.forEach((c) => supabase.removeChannel(c))
 }
 
 // 친구에게 보낼 초대 링크. 열면 로그인 후 자동으로 입장한다

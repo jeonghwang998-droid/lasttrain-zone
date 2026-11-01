@@ -3,7 +3,7 @@ flask-cors==5.*
 gunicorn==23.*
 python-dotenv==1.*
 pydantic==2.*
-PyJWT==2.*
+PyJWT[crypto]==2.*
 requests==2.*
 redis==5.*
 pywebpush==2.*

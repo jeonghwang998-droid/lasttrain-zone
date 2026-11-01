@@ -8,7 +8,23 @@
 
 export const TRANSIT_CONNECTED = false
 
-// 반환: [{ name, board, walkM, legs: [{ name, deps: [분], ride, xfer, line, c }] }]
-export async function fetchRoutes() {
+// trip: { from: { name, lat?, lng? }, to: { name, lat?, lng? } }  (사용자가 입력한 출발지와 도착지)
+//
+// 반환: 탈 수 있는 경로 목록. 화면(routeview.js)과 역산(planner.js)이 이 모양을 그대로 읽는다.
+//   [{
+//     name,        // 경로 이름
+//     board,       // 첫 탑승역/정류장 이름
+//     walkM,       // 출발지에서 첫 탑승역까지 걷는 거리(m)
+//     legs: [{     // 환승할 때마다 구간이 하나씩 늘어난다 (예: 1호선 → 수인분당선)
+//       name,      // 노선 이름 (예: "1호선")
+//       from, to,  // 탑승역, 하차역 이름
+//       deps,      // 탑승역 출발 시각(분, 오름차순). 마지막 값이 그 노선 막차
+//       ride,      // 탑승 시간(분)
+//       xfer,      // 내린 뒤 다음 구간 타는 곳까지 걷는 시간(분). 마지막 구간은 0
+//       line,      // 지연 예측 모델 키 (예: "1호선"), 모르면 생략
+//       c,         // 노선 색 (#rrggbb)
+//     }]
+//   }]
+export async function fetchRoutes(trip) {
   return []
 }

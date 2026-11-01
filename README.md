@@ -42,17 +42,16 @@
 
 | 영역 | 기술 | 선택 이유 |
 |---|---|---|
-| 프론트엔드 | React + Vite + TypeScript, vite-plugin-pwa | 설치 없이 웹으로 바로 쓰고, 홈 화면 추가 시 앱처럼 동작 |
+| 프론트엔드 | 바닐라 JavaScript(ES 모듈) + HTML + CSS, 서비스 워커(PWA) | 빌드 도구 없이 바로 실행되고, 홈 화면 추가 시 앱처럼 동작. 화면 수가 적어 프레임워크가 필요 없음 |
 | 지도 | Kakao Maps JavaScript SDK | 국내 지도, 원/다각형 그리기 지원 |
-| 상태 관리 | Zustand | 가볍고 보일러플레이트가 적음 |
-| 백엔드 | Flask (Python 3.11) | ML 모델과 같은 언어, 팀이 사용해본 프레임워크 |
+| 백엔드 | Flask (Python 3.11) | ML 모델과 같은 언어, 팀이 사용해본 프레임워크. 개발 중에는 프론트 파일도 함께 서비스 |
 | DB / 인증 / 실시간 | Supabase (PostgreSQL, Auth, Realtime) | 직접 서버를 운영하지 않고 RLS로 권한 제어 |
 | 캐시 / 알림 큐 | Redis | 경로 캐싱, Sorted Set 기반 알림 예약 |
 | 푸시 | Web Push (VAPID) + pywebpush | 앱스토어 없이 폰 알림 |
 | 공간 연산 | H3 (육각형 격자) | 자기장 교집합 계산 |
 | ML | scikit-learn (GradientBoosting 분위수 회귀) | 데이터가 적어도 안정적, 해석 가능 |
 | 외부 API | ODsay(대중교통), 기상청 단기예보, 서울시 실시간 지하철 도착정보 | 경로, 날씨, 지연 학습 데이터 |
-| 배포 | Vercel(프론트), Docker Compose on VM(백엔드, Redis, 워커), Supabase Cloud | HTTPS 필수(위치, 푸시) 충족 |
+| 배포 | Docker Compose on VM(백엔드, Redis, 워커), 프론트는 Flask 또는 정적 호스팅, Supabase Cloud | HTTPS 필수(위치, 푸시) 충족 |
 
 ---
 
@@ -60,7 +59,7 @@
 
 ```mermaid
 flowchart TB
-    subgraph Client["클라이언트 (React PWA)"]
+    subgraph Client["클라이언트 (바닐라 JS PWA)"]
         UI["화면<br/>자기장 지도 · 카운트다운 · 모임방"]
         SW["Service Worker<br/>웹 푸시 수신"]
         GEO["Geolocation API<br/>현재 위치"]
@@ -118,7 +117,7 @@ flowchart TB
 
 | 구성 요소 | 역할 |
 |---|---|
-| React PWA | 위치 수집, 자기장 지도 렌더링, 카운트다운, 모임방 화면, 푸시 구독 |
+| 바닐라 JS PWA | 위치 수집, 자기장 지도 렌더링, 카운트다운, 모임방 화면, 푸시 구독 |
 | Flask API | 인증 확인, 역산/자기장 계산 요청 처리, 모임방 관리, 알림 예약 |
 | core | 서비스의 두뇌. 역산 알고리즘, 역방향 탐색(자기장), 택시비 추정, 막차 확률 |
 | ml | 학습된 지연 예측 모델 로드/추론, 개인 보행 속도 추정 |
@@ -139,47 +138,25 @@ lasttrain-zone/
 ├── .env.example                # 필요한 환경 변수 목록 (실제 키는 커밋 금지)
 ├── .gitignore
 │
-├── frontend/                   # React + Vite + TypeScript (PWA)
-│   ├── index.html
-│   ├── vite.config.ts          # vite-plugin-pwa 설정
-│   ├── package.json
-│   ├── public/
-│   │   └── icons/              # PWA 아이콘
-│   └── src/
-│       ├── main.tsx
-│       ├── App.tsx             # 라우팅
-│       ├── sw.ts               # 서비스 워커 (push 이벤트 → 알림 표시)
-│       ├── pages/
-│       │   ├── HomePage.tsx        # 내 카운트다운 + 내 자기장
-│       │   ├── RoomPage.tsx        # 모임방: 멤버 순위, 교집합 자기장, 다 같이 일어나기
-│       │   ├── JoinPage.tsx        # 초대 코드 입장
-│       │   ├── OnboardingPage.tsx  # 집 위치 등록, 알림 권한 요청
-│       │   └── SettingsPage.tsx    # 여유 시간, 보행 기록
-│       ├── components/
-│       │   ├── map/
-│       │   │   ├── ZoneMap.tsx         # 카카오맵 + 자기장 원 그리기
-│       │   │   └── HexOverlay.tsx      # 교집합 H3 육각형 표시
-│       │   ├── Countdown.tsx
-│       │   ├── RouteCard.tsx           # 구간별 경로, 막차 확률
-│       │   ├── TaxiMeter.tsx           # 택시비 미터기
-│       │   ├── MemberList.tsx
-│       │   └── CallBanner.tsx          # 다 같이 일어나기 알림 배너
-│       ├── hooks/
-│       │   ├── useGeolocation.ts       # 위치 감시, 일정 거리 이상 이동 시만 갱신
-│       │   ├── useCountdown.ts
-│       │   ├── useRoomRealtime.ts      # Supabase Realtime 구독
-│       │   └── useArrivalCheck.ts      # 집 반경 진입 감지 → 귀가 완료
-│       ├── lib/
-│       │   ├── api.ts                  # 백엔드 호출 (JWT 자동 첨부)
-│       │   ├── supabase.ts
-│       │   ├── push.ts                 # 푸시 구독 등록
-│       │   └── geo.ts                  # 거리 계산, 좌표 유틸
-│       ├── store/
-│       │   └── useAppStore.ts          # Zustand
-│       ├── styles/
-│       │   └── global.css
-│       └── types/
-│           └── index.ts                # Plan, Zone, Room, Member 타입
+├── frontend/                   # 바닐라 JS + HTML + CSS (PWA, 빌드 도구 없음)
+│   ├── index.html              # 시작 화면
+│   ├── sw.js                   # 서비스 워커
+│   ├── css/
+│   │   └── global.css
+│   ├── html/                   # 화면별 HTML
+│   │   ├── login.html / signup.html / onboarding.html
+│   │   ├── dashboard.html          # 나(막차 역산) / 우리 테이블(모임) / 내 걸음
+│   │   ├── join.html               # 초대 링크·코드 입장
+│   │   └── profile.html            # 내 정보, 서버 연결 확인
+│   ├── public/                 # manifest, PWA 아이콘
+│   └── src/js/                 # 화면별 스크립트 (ES 모듈)
+│       ├── config.js               # Supabase 공개 키, 백엔드 주소 (비밀 키 금지)
+│       ├── supabase.js / db.js     # Supabase 직접 통신 (RLS 로 보호)
+│       ├── api.js                  # Flask 호출 (로그인 토큰 자동 첨부)
+│       ├── account.js              # 가입, 로그인, 탈퇴
+│       ├── rooms.js                # 모임 만들기, 입장, 멤버, 막차 입력
+│       ├── planner.js / transit.js / clock.js
+│       └── dashboard.js, profile.js, join.js ...   # 화면별 진입 스크립트
 │
 ├── backend/                    # Flask
 │   ├── Dockerfile
@@ -192,8 +169,9 @@ lasttrain-zone/
 │   ├── app/
 │   │   ├── __init__.py         # create_app(), 시작 시 시간표/모델 메모리 적재
 │   │   ├── config.py
-│   │   ├── auth.py             # Supabase JWT 검증 데코레이터
+│   │   ├── auth.py             # Supabase JWT 검증 데코레이터 (ES256 JWKS / HS256)
 │   │   ├── api/                # Blueprint (요청/응답만 담당, 로직 없음)
+│   │   │   ├── me.py               # 로그인한 나 확인
 │   │   │   ├── plan.py
 │   │   │   ├── zone.py
 │   │   │   ├── rooms.py
@@ -231,6 +209,7 @@ lasttrain-zone/
 │
 └── docs/
     ├── api.md                  # 상세 API 명세
+    ├── sql/                    # Supabase 에서 실행할 SQL (예: 004_room_last_trains.sql)
     └── presentation/           # 발표 자료, 시연 영상
 ```
 
@@ -503,6 +482,7 @@ erDiagram
 
 | 메서드 | 경로 | 요청 | 응답 | 설명 |
 |---|---|---|---|---|
+| GET | `/api/me` | | `{user_id, nickname, buffer_min, walk_speed}` | 로그인한 사용자 확인 (구현됨) |
 | POST | `/api/plan` | `{lat, lng, buffer_min?}` | `{best, routes[], taxi_fare}` | 내 막차 계산 + 알림 예약 |
 | GET | `/api/zone` | (집은 프로필에서) | `{stations: [{id, name, lat, lng, deadline}]}` | 내 자기장 |
 | POST | `/api/rooms` | `{place_label, lat, lng}` | `{room_id, code}` | 모임방 생성 |
@@ -541,15 +521,15 @@ erDiagram
 ```
 # Supabase
 SUPABASE_URL=
-SUPABASE_ANON_KEY=           # 프론트용
+SUPABASE_ANON_KEY=           # 백엔드가 사용자 토큰으로 읽을 때 쓰는 공개 키
 SUPABASE_SERVICE_ROLE_KEY=   # 백엔드 전용, 절대 프론트에 넣지 말 것
-SUPABASE_JWT_SECRET=
+SUPABASE_JWT_SECRET=          # 토큰이 HS256(예전 방식)일 때만 필요. 새 프로젝트(ES256)는 비워도 됨
 
 # 외부 API
 ODSAY_API_KEY=
 KMA_API_KEY=
 SEOUL_OPENAPI_KEY=           # ML 데이터 수집용
-VITE_KAKAO_MAP_KEY=
+# 카카오 JavaScript 키는 브라우저가 읽으므로 .env 가 아니라 frontend/src/js/config.js 에 넣는다
 
 # Web Push
 VAPID_PUBLIC_KEY=
@@ -569,13 +549,16 @@ cp .env.example .env    # 값 채우기
 # 2. DB 스키마
 #    DB 스키마와 함수는 Supabase 대시보드에서 직접 관리한다 (이 저장소에 SQL 파일은 없다)
 
-# 3. 백엔드 + Redis + 알림 워커
-docker compose up --build
+# 3. 백엔드 (Windows, Python 3.11)
+cd backend
+py -3.11 -m venv .venv
+.venvScriptsactivate
+pip install -r requirements.txt
+python wsgi.py              # http://127.0.0.1:5000 (화면 + API)
+#    (Redis 와 알림 워커까지 한 번에: 루트에서 docker compose up --build)
 
-# 4. 프론트엔드
-cd frontend
-npm install
-npm run dev
+# 4. 프론트엔드: 빌드가 없다. Flask 서버가 frontend/ 를 함께 내주므로
+#    서버를 켜고 http://127.0.0.1:5000 을 열면 된다
 
 # 5. (선택) ML 모델 학습
 cd ml
@@ -605,8 +588,8 @@ cp models/delay_model.joblib ../backend/app/ml/models/
 | 주차 | 목표 | 산출물 |
 |---|---|---|
 | 9주차 | 레포, 환경 세팅 / DB 스키마 / 역, 시간표 데이터 적재 / **ML 데이터 수집 시작** | stations.csv, collect.py 상시 실행 |
-| 10주차 | 막차 역산 API + 홈 화면 카운트다운 | `/api/plan`, HomePage |
-| 11주차 | 역방향 탐색 + **자기장 지도** | `/api/zone`, ZoneMap |
+| 10주차 | 막차 역산 API + 홈 화면 카운트다운 | `/api/plan`, 홈 화면(dashboard) |
+| 11주차 | 역방향 탐색 + **자기장 지도** | `/api/zone`, 자기장 지도 화면 |
 | 12주차 | 모임방, Realtime 멤버 순위, 웹 푸시, **다 같이 일어나기 콜** | `/api/rooms/*`, worker.py |
 | 13주차 | 실제 데이터로 재학습, 막차 확률, 택시비 미터기, 교집합 | probability.py, TaxiMeter |
 | 14주차 | 배포, 통합 테스트, 안심 귀가, **시연 영상 녹화** | 배포 주소, 시연 영상 |
@@ -620,5 +603,5 @@ cp models/delay_model.joblib ../backend/app/ml/models/
 |---|---|
 | 백엔드 / 알고리즘 | `backend/core`, `/api/plan`, `/api/zone`, 역방향 탐색 |
 | 백엔드 / 인프라 | Supabase 스키마, RLS, Redis, 알림 워커, 배포 |
-| 프론트엔드 | PWA, 지도, 모임방 화면, 푸시 구독 |
+| 프론트엔드 | PWA, 지도, 모임방 화면, 푸시 구독 (바닐라 JS) |
 | ML / 데이터 | 데이터 수집, 학습, 확률 계산, 발표용 성능 비교 |

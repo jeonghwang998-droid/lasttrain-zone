@@ -3,6 +3,7 @@
 import { initApp, url } from './app.js'
 import { HOMES } from './data.js'
 import { getUser, updateUser, logout, withdraw, getPrefs, setPrefs } from './account.js'
+import { getMe } from './api.js'
 
 initApp()
 
@@ -145,5 +146,18 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2000)
 }
 
+/* ---------- 서버 연결 확인 ---------- */
+async function checkServer() {
+  if (!getUser()) return
+  $('server-check').hidden = false
+  try {
+    const me = await getMe()
+    $('serverState').textContent = `서버가 로그인한 나를 알아봤어요: ${me.nickname}`
+  } catch (e) {
+    $('serverState').textContent = e.message
+  }
+}
+
 renderAccount()
 renderPermission()
+checkServer()

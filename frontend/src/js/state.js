@@ -7,6 +7,7 @@ export const S = {
   buffer: 0, // 여유 시간(분): profiles.buffer_min
   walkSpeed: 0, // 내 보행 속도(m/분): profiles.walk_speed
   walkDefault: 0, // 전체 평균 보행 속도: app_config walk_speed.default
+  trip: null, // 어디에서 어디까지: { from: {name, lat?, lng?}, to: {...} }
   routes: [], // 탈 수 있는 경로 (transit.js)
   fired: {}, // 이미 울린 알림
 }

@@ -1,4 +1,5 @@
 import os
+from urllib.parse import unquote
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,10 +11,14 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 
 
 class Config:
-    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+    SUPABASE_URL = (os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL", "")).rstrip("/")
     SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-    SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")
+    SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "")  # HS256(예전 방식) 토큰일 때만 필요
+    # 사용자 토큰으로 Supabase 를 읽을 때 쓰는 공개 키. 프론트와 같은 값
+    SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY", "")
 
+    # 공공데이터포털 인증키. Encoding 키(%가 들어 있는 것)를 넣어도 requests 가 다시 인코딩하지 않도록 풀어서 쓴다
+    DATA_GO_KR_KEY = unquote(os.getenv("DATA_GO_KR_KEY", ""))
     ODSAY_API_KEY = os.getenv("ODSAY_API_KEY", "")
     KMA_API_KEY = os.getenv("KMA_API_KEY", "")
 
@@ -22,7 +27,8 @@ class Config:
     VAPID_SUBJECT = os.getenv("VAPID_SUBJECT", "")
 
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    # 쉼표로 여러 개 가능 (Vite 5173, VS Code Go Live 5500 등)
+    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173,http://localhost:5500,http://127.0.0.1:5500")
 
     DATA_DIR = BASE_DIR / "data"
     MODEL_PATH = BASE_DIR / "app" / "ml" / "models" / "delay_model.joblib"
@@ -31,4 +37,7 @@ class Config:
     DEFAULT_BUFFER_MIN = 5
     ROUTE_CACHE_TTL_SEC = 600
     ZONE_CACHE_TTL_SEC = 1800
+    SUBWAY_CATALOG_TTL_SEC = 7 * 24 * 3600  # 노선/역 목록은 자주 안 바뀐다
+    LAST_TRAIN_CACHE_TTL_SEC = 6 * 3600     # 역별 시간표(막차)
+    SUBWAY_CATALOG_PATH = DATA_DIR / "subway_catalog.json"  # 받아 둔 노선/역 목록 (git 제외)
     ALERT_OFFSETS_MIN = (30, 10, 0)
