@@ -1,7 +1,7 @@
 """지하철 연결망 자료 만들기 (KRIC). backend 폴더에서 실행한다.
 
     python build_network.py                  # 수도권, 평일
-    python build_network.py --day 02         # 수도권, 토요일 (01 평일 / 02 토 / 03 일·휴일)
+    python build_network.py --day 03         # 수도권, 토·일·휴일 (01 평일 / 02 토 / 03 일·휴일. 토요일은 휴일 시간표)
     python build_network.py --region 부산
     python build_network.py --rediscover     # 노선 목록을 다시 찾는다
 

@@ -3,11 +3,15 @@
 1) 노선 찾기: 이미 가진 공공데이터(TAGO) 역 ID 는 'MTR' + 운영기관(2자) + 노선코드 + 역코드 모양이다.
    여기서 노선코드 후보를 뽑아 KRIC 노선정보로 확인한다 (코드표가 따로 공개돼 있지 않아서)
 2) 시간표 모으기: 노선의 역마다 시간표를 받는다. 호출이 많아서 중간에 끊겨도 받은 만큼 저장하고 이어서 받는다
+3) 서버를 켤 때 자료가 없으면 백그라운드에서 1), 2)를 알아서 한다 (wsgi.py). build_network.py 로 직접 받아도 된다
 """
 from __future__ import annotations
 
 import json
+import os
 import re
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -167,9 +171,81 @@ def build_timetables(region: str, day_code: str, progress=print) -> dict:
                 _write(path, table)
                 progress(f"  {done}/{len(todo)}")
     _write(path, table)
+    # 모든 역을 받았을 때만 '다 받음'으로 표시한다. 반쯤 받았거나 전부 비어 있는 자료로는 경로를 계산하지 않는다
+    if errors == 0 and any(table.values()):
+        _write(_done_path(region, day_code), {"stations": len(table)})
     progress(f"[{region}/{day_code}] 완료: 새로 {done}개, 실패 {errors}개, 전체 {len(table)}개 역")
     return table
 
 
+def _done_path(region: str, day: str) -> Path:
+    return DATA / f"timetable_{region}_{day}.done"
+
+
+def is_complete(region: str, day_code: str) -> bool:
+    """노선의 모든 역 시간표를 다 받았는지"""
+    return _done_path(region, day_code).exists() and _timetable_path(region, day_code).exists()
+
+
 def load_timetable(region: str, day_code: str) -> dict | None:
     return _read(_timetable_path(region, day_code))
+
+
+# ---------- 3) 서버를 켤 때 없으면 알아서 받기 ----------
+LOCK = DATA / "build.lock"
+LOCK_STALE_SEC = 30 * 60  # 이 시간 동안 잠금 파일이 갱신되지 않으면 받던 프로세스가 죽은 것으로 본다
+
+
+def is_building() -> bool:
+    """어느 프로세스든 지금 자료를 받는 중인지 (개발 모드는 서버 프로세스가 두 개라 파일로 확인한다)"""
+    try:
+        return time.time() - LOCK.stat().st_mtime < LOCK_STALE_SEC
+    except OSError:
+        return False
+
+
+def _take_lock() -> bool:
+    DATA.mkdir(parents=True, exist_ok=True)
+    if LOCK.exists() and not is_building():
+        LOCK.unlink(missing_ok=True)  # 죽은 프로세스가 남긴 잠금
+    try:
+        os.close(os.open(LOCK, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        return True
+    except FileExistsError:
+        return False
+
+
+def start_auto_build(app, region_name: str = "수도권") -> None:
+    """자료가 덜 받아져 있으면 백그라운드에서 받는다. 오늘 요일 시간표부터, 그다음 나머지 요일"""
+    region = kric.REGION_CODES[region_name]
+    from ..core.subway import daily_type  # 여기서만 쓰는 것이라 늦게 불러온다
+
+    today = kric.DAY_CODES[daily_type()]
+    days = list(dict.fromkeys([today, *kric.DAY_CODES.values()]))  # 오늘 요일 먼저, 같은 시간표는 한 번만
+    if load_lines(region) and all(is_complete(region, d) for d in days):
+        return
+
+    def run():
+        from ..api.subway import _load_catalog  # 순환 import 를 피하려고 여기서 불러온다
+
+        with app.app_context():
+            log = app.logger
+            if not Config.KRIC_API_KEY:
+                log.warning("[kric] KRIC_API_KEY 가 없어서 지하철 시간표 자료를 받지 않아요")
+                return
+            if not _take_lock():
+                return  # 다른 프로세스가 받는 중
+            touch = lambda msg: (LOCK.touch(), log.info("[kric] %s", msg))  # noqa: E731
+            try:
+                if not load_lines(region):
+                    discover_lines(region_name, _load_catalog()["lines"], progress=touch)
+                for day in days:
+                    if not is_complete(region, day):
+                        build_timetables(region, day, progress=touch)
+                log.info("[kric] 지하철 시간표 자료 준비 끝")
+            except (kric.KricApiError, RuntimeError) as e:
+                log.error("[kric] 시간표 자료를 받다가 멈췄어요. 서버를 다시 켜면 이어서 받아요: %s", e)
+            finally:
+                LOCK.unlink(missing_ok=True)
+
+    threading.Thread(target=run, name="kric-auto-build", daemon=True).start()

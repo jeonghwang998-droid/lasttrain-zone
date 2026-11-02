@@ -555,9 +555,10 @@ py -3.11 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python check_keys.py        # .env 의 키가 모두 연결되는지 확인
-python build_network.py     # 지하철 경로 자료(KRIC 노선, 역 시간표) 받기. 수도권 평일 기준 몇 분 걸린다
-                            #   토요일: --day 02, 일·휴일: --day 03, 다른 권역: --region 부산
 python wsgi.py              # http://127.0.0.1:5000 (화면 + API)
+                            #   처음 켤 때 지하철 시간표 자료(KRIC, 수도권 평일·휴일)를 뒤에서 받는다. 15분쯤 걸리고
+                            #   그동안 경로 화면은 "받는 중" 안내가 나온다. 중간에 꺼도 다시 켜면 이어서 받는다
+                            #   (직접 받으려면 python build_network.py, 다른 권역은 --region 부산)
 #    (Redis 와 알림 워커까지 한 번에: 루트에서 docker compose up --build)
 
 # 4. 프론트엔드: 빌드가 없다. Flask 서버가 frontend/ 를 함께 내주므로

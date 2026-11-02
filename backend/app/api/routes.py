@@ -29,7 +29,9 @@ _cache: dict[tuple[str, str], tuple[float, router.Network]] = {}  # (권역, 요
 
 
 def _network(region: str, day: str) -> router.Network | None:
-    """디스크에 받아 둔 KRIC 자료로 연결망을 만든다. 자료 파일이 바뀌면 다시 만든다"""
+    """디스크에 받아 둔 KRIC 자료로 연결망을 만든다. 다 받은 자료만 쓰고, 자료 파일이 바뀌면 다시 만든다"""
+    if not kric_net.is_complete(region, day):
+        return None
     path = kric_net.DATA / f"timetable_{region}_{day}.json"
     try:
         mtime = path.stat().st_mtime
@@ -103,7 +105,9 @@ def find():
     day_label = subway_core.DAILY_LABELS[daily]
     net = _network(region, kric.DAY_CODES[daily])
     if net is None:
-        current_app.logger.warning("[routes] %s/%s 시간표 자료가 없어요. build_network.py 로 받아 주세요", region, daily)
+        if kric_net.is_building():
+            return jsonify(routes=[], day=day_label, note="지하철 시간표 자료를 받는 중이에요. 몇 분 뒤 다시 열어 주세요.")
+        current_app.logger.warning("[routes] %s/%s 시간표 자료가 없어요. 서버를 다시 켜면 받기 시작해요", region, daily)
         return jsonify(routes=[], day=day_label, note="이 지역의 오늘 시간표 자료가 아직 준비되지 않았어요.")
 
     origin_node = net.by_tago.get(origin)
