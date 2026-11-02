@@ -116,39 +116,3 @@ def best_plan(routes: list[Route], lat: float, lng: float, now: int, buffer: int
 def alert_times(plan: Plan, now: int, offsets=(30, 10, 0)) -> list[tuple[int, int]]:
     """(알림 보낼 시각, 몇 분 전 알림인지). 이미 지난 알림은 제외 -> 스케줄러 큐에 넣을 값"""
     return [(plan.leave_at - o, o) for o in offsets if plan.leave_at - o >= now]
-
-
-# ---------- 실행 예시 (시간표는 시연용 가짜 데이터) ----------
-if __name__ == "__main__":
-    T = lambda *xs: [to_min(x) for x in xs]
-
-    subway = Route(
-        name="1호선 -> 금정 환승 -> 4호선",
-        board_lat=36.8100, board_lng=127.1464,  # 천안역 부근
-        legs=[
-            Leg("1호선 천안 -> 금정", T("22:00", "22:20", "22:41", "23:05"), ride=62, transfer_walk=3),
-            Leg("4호선 금정 -> 중앙", T("23:40", "23:52", "00:08"), ride=30),
-        ],
-    )
-    bus = Route(
-        name="시외버스 안산행",
-        board_lat=36.8195, board_lng=127.1560,  # 천안터미널 부근
-        legs=[Leg("시외버스", T("21:10", "22:10"), ride=70)],
-    )
-
-    here = (36.8160, 127.1520)  # 술자리 위치
-    now = to_min("22:00")
-
-    for r in (subway, bus):
-        p = plan_route(r, *here, buffer=5)
-        if p:
-            path = ", ".join(f"{leg.name} {fmt(t)}" for leg, t in zip(r.legs, p.boardings))
-            print(f"[{r.name}] {fmt(p.leave_at)}에 출발 (도보 {p.walk}분) | {path}")
-
-    best = best_plan([subway, bus], *here, now=now)
-    if best:
-        print(f"\n추천: {best.route.name}, {fmt(best.leave_at)}까지 일어나기")
-        for at, o in alert_times(best, now):
-            print(f"  알림 예약 {fmt(at)} ({o}분 전)")
-    else:
-        print("\n탈 수 있는 막차가 없어요")

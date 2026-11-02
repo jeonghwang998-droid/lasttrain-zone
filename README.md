@@ -547,13 +547,16 @@ REDIS_URL=redis://redis:6379/0
 cp .env.example .env    # 값 채우기
 
 # 2. DB 스키마
-#    DB 스키마와 함수는 Supabase 대시보드에서 직접 관리한다 (이 저장소에 SQL 파일은 없다)
+#    Supabase 대시보드 > SQL Editor 에서 docs/sql/ 의 SQL 을 번호 순서대로 실행한다
 
 # 3. 백엔드 (Windows, Python 3.11)
 cd backend
 py -3.11 -m venv .venv
-.venvScriptsactivate
+.venv\Scripts\activate
 pip install -r requirements.txt
+python check_keys.py        # .env 의 키가 모두 연결되는지 확인
+python build_network.py     # 지하철 경로 자료(KRIC 노선, 역 시간표) 받기. 수도권 평일 기준 몇 분 걸린다
+                            #   토요일: --day 02, 일·휴일: --day 03, 다른 권역: --region 부산
 python wsgi.py              # http://127.0.0.1:5000 (화면 + API)
 #    (Redis 와 알림 워커까지 한 번에: 루트에서 docker compose up --build)
 

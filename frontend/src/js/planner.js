@@ -35,26 +35,34 @@ export function planRoute(route, useAI) {
   const out = []
   for (let i = route.legs.length - 1; i >= 0; i--) {
     const leg = route.legs[i]
+    if (!leg.deps.length) return null
+    // 열차마다 실제 도착 시각(arrs)이 있으면 그걸 쓴다 (급행과 일반 열차는 걸리는 시간이 다르다)
+    const arrOf = (j) => (leg.arrs ? leg.arrs[j] : leg.deps[j] + leg.ride)
     let pick = null
+    let pickArr = null
     let late = 0
     let raw = null // 지연을 고려하지 않았을 때 고를 열차
     if (deadline === null) {
       pick = leg.deps[leg.deps.length - 1]
+      pickArr = arrOf(leg.deps.length - 1)
     } else {
       for (let j = leg.deps.length - 1; j >= 0; j--) {
         const dep = leg.deps[j]
-        if (dep + leg.ride + leg.xfer > deadline) continue
+        const arr = arrOf(j)
+        if (arr + leg.xfer > deadline) continue
         if (raw === null) raw = dep
         const lt = useAI ? lateFor(leg, dep) : 0
-        if (dep + leg.ride + leg.xfer + lt <= deadline) {
+        // 환승마다 S.xferBuffer 분의 여유를 둔다 (딱 맞는 열차는 조금만 늦어도 다음 막차를 놓친다)
+        if (arr + leg.xfer + S.xferBuffer + lt <= deadline) {
           pick = dep
+          pickArr = arr
           late = lt
           break
         }
       }
       if (pick === null) return null
     }
-    out.unshift({ leg, dep: pick, late, raw })
+    out.unshift({ leg, dep: pick, arr: pickArr, late, raw })
     deadline = pick
   }
   const speed = (useAI ? S.walkSpeed : S.walkDefault) || S.walkDefault || 1

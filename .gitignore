@@ -26,3 +26,5 @@ Thumbs.db
 
 # 받아 둔 지하철 노선/역 목록
 backend/data/subway_catalog.json
+# 받아 둔 KRIC 노선/시간표 (build_network.py)
+backend/data/kric/

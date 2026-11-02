@@ -94,10 +94,39 @@ def check_data_go_kr():
     report("공공데이터포털", ok, "키가 정상이에요." if ok else f"오류: {result.get('resultMsg')}")
 
 
+KRIC_BASE = "https://openapi.kric.go.kr/openapi/"
+
+
+def check_kric(name, env_name, key, path, params):
+    """KRIC API 하나를 설명서의 샘플 요청 그대로 불러 본다"""
+    if not key:
+        return report(name, False, f".env 에 {env_name} 가 없어요. data.kric.go.kr 에서 발급받은 서비스키를 넣어 주세요.")
+    try:
+        res = requests.get(KRIC_BASE + path, params={"serviceKey": key, "format": "json", **params}, timeout=TIMEOUT)
+        body = res.json()
+    except (requests.RequestException, ValueError):
+        return report(name, False, "응답을 받지 못했거나 형식이 달라요.")
+    header = body.get("header") or {}
+    code = str(header.get("resultCode", ""))
+    if code == "00":
+        return report(name, True, "키가 정상이에요.")
+    if code == "30":
+        return report(name, False, "등록되지 않은 서비스키예요. 키를 다시 복사했는지, 활용신청이 승인됐는지 확인해 주세요.")
+    report(name, False, f"오류 코드 {code}: {header.get('resultMsg')}")
+
+
 if __name__ == "__main__":
     check_supabase()
     check_kakao()
     check_data_go_kr()
+    check_kric(
+        "KRIC 도시철도 전체노선정보", "KRIC_API_KEY", Config.KRIC_API_KEY,
+        "trainUseInfo/subwayRouteInfo", {"mreaWideCd": "01", "lnCd": "A1"},
+    )
+    check_kric(
+        "KRIC 역사별 운행시각표", "KRIC_API_KEY", Config.KRIC_API_KEY,
+        "convenientInfo/stationTimetable", {"railOprIsttCd": "S1", "lnCd": "3", "stinCd": "312", "dayCd": "8"},
+    )
     print()
     print("모두 연결됐어요." if all(results) else "연결되지 않은 항목이 있어요. 위 안내대로 고친 뒤 다시 실행해 보세요.")
     sys.exit(0 if all(results) else 1)

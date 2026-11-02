@@ -4,8 +4,11 @@
 
 import { fm } from './clock.js'
 
-// 환승 연결 여유가 이 분 이하면 '빠듯해요'로 강조한다
-export const TIGHT_SLACK_MIN = 3
+// 도착지가 내 집일 때 화면에 보이는 이름
+const HOME_LABEL = '우리집'
+
+// 환승 연결 여유가 이 분 이하면 '빠듯해요'로 강조한다 (기본 환승 여유 3분보다 작아야 눈에 띈다)
+export const TIGHT_SLACK_MIN = 2
 
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
@@ -17,7 +20,7 @@ const badge = (leg) => `<span class="badge"${safeColor(leg.c) ? ` style="--c:${s
 
 // 한 구간: 노선 배지, 탑승역 → 하차역, 출발과 도착 시각, 막차 표시
 function rideItem(x, next) {
-  const { leg, dep, late } = x
+  const { leg, dep, arr, late } = x
   const color = safeColor(leg.c)
   const stations = [leg.from, leg.to].filter(Boolean).map(esc).join(' <i>→</i> ')
   const isOwnLast = dep === leg.deps[leg.deps.length - 1]
@@ -30,7 +33,7 @@ function rideItem(x, next) {
   return (
     `<li class="ride"${color ? ` style="--c:${color}"` : ''}>` +
     `<div class="ride-top">${badge(leg)}<span class="stations">${stations}</span></div>` +
-    `<div class="ride-time"><b>${fm(dep)}</b> 출발 <span class="arr">→ ${fm(dep + leg.ride)} 도착 · ${leg.ride}분</span></div>` +
+    `<div class="ride-time"><b>${fm(dep)}</b> 출발 <span class="arr">→ ${fm(arr)} 도착 · ${arr - dep}분</span></div>` +
     `<div class="ride-tags">${tag}${late ? `<span class="late">AI 예상 지연 최대 ${late}분</span>` : ''}</div>` +
     `</li>`
   )
@@ -38,7 +41,7 @@ function rideItem(x, next) {
 
 // 환승: 어느 역에서 몇 분 걷고, 다음 열차까지 여유가 얼마나 남는지
 function transferItem(x, next) {
-  const slack = next.dep - (x.dep + x.leg.ride + x.leg.xfer)
+  const slack = next.dep - (x.arr + x.leg.xfer)
   const tight = slack <= TIGHT_SLACK_MIN
   const where = x.leg.to ? `${esc(x.leg.to)} 환승` : '환승'
   return (
@@ -47,12 +50,24 @@ function transferItem(x, next) {
   )
 }
 
-function routeItem(p, i, trip, ai) {
-  const r = p.route
-  const last = p.legs[p.legs.length - 1]
-  const arrive = last.dep + last.leg.ride
-  const transfers = p.legs.length - 1
+const durationText = (min) => (min >= 60 ? `${Math.floor(min / 60)}시간 ${min % 60}분` : `${min}분`)
 
+// 경로 하나의 요약 수치: 도착 시각, 환승 횟수, 걸리는 시간, 가장 빠듯한 환승 여유
+function planFacts(p) {
+  const first = p.legs[0]
+  const last = p.legs[p.legs.length - 1]
+  const arrive = last.arr
+  let tightest = null
+  p.legs.forEach((x, k) => {
+    const next = p.legs[k + 1]
+    if (!next) return
+    const slack = next.dep - (x.arr + x.leg.xfer)
+    tightest = tightest === null ? slack : Math.min(tightest, slack)
+  })
+  return { arrive, transfers: p.legs.length - 1, total: arrive - (first.dep - p.walk), tightest }
+}
+
+function timelineHtml(p, trip, ai) {
   let why = ''
   p.legs.forEach((x, k) => {
     if (k < p.legs.length - 1 && x.raw !== null && x.raw !== x.dep) {
@@ -67,33 +82,50 @@ function routeItem(p, i, trip, ai) {
     if (next) steps += transferItem(x, next)
   })
 
+  const last = p.legs[p.legs.length - 1]
+  const arrive = last.arr
   const from = trip && trip.from ? trip.from.name : ''
-  const to = trip && trip.to ? trip.to.name : ''
-
+  const to = trip && trip.to ? (trip.to.isHome ? HOME_LABEL : trip.to.name) : ''
   return (
-    `<li class="route" id="r${i}">` +
-    `<div class="route-head"><div class="route-info">` +
-    `<div class="chips">${p.legs.map((x) => badge(x.leg)).join('<span class="sep">›</span>')}${i === 0 ? '<span class="pick">가장 늦게 출발 가능</span>' : ''}</div>` +
-    `<div class="route-meta">${transfers ? `환승 ${transfers}회` : '환승 없음'} · ${fm(arrive)} 도착</div>` +
-    `</div><div class="route-leave"><small>출발</small><span class="st" id="rs${i}"></span></div></div>` +
     `<ol class="timeline">` +
     `<li class="node start"><div class="node-name">${esc(from) || '출발'}</div>` +
-    `<div class="node-sub">${r.board ? `${esc(r.board)}까지 ` : ''}걸어서 ${p.walk}분</div></li>` +
+    `<div class="node-sub">${p.route.board ? `${esc(p.route.board)}까지 ` : ''}걸어서 ${p.walk}분</div></li>` +
     steps +
     `<li class="node end"><div class="node-name">${esc(to) || '도착'}</div><div class="node-sub">${fm(arrive)} 도착</div></li>` +
-    `</ol>${why && ai ? `<p class="why">${esc(why)}</p>` : ''}</li>`
+    `</ol>${why && ai ? `<p class="why">${esc(why)}</p>` : ''}`
   )
 }
 
-export function routeCardsHtml(plans, trip, ai) {
-  return plans.map((p, i) => routeItem(p, i, trip, ai)).join('')
+// i: 이 경로의 번호(tick 이 출발까지 남은 시간을 채우는 자리의 id 가 된다), collapsible: 접어 두는 카드
+function routeItem(p, i, trip, ai, collapsible) {
+  const f = planFacts(p)
+  const tight = f.tightest !== null && f.tightest <= TIGHT_SLACK_MIN
+  const head =
+    `<div class="route-head"><div class="route-info">` +
+    `<div class="chips">${p.legs.map((x) => badge(x.leg)).join('<span class="sep">›</span>')}${i === 0 ? '<span class="pick">가장 늦게 출발 가능</span>' : ''}</div>` +
+    `<div class="route-meta">${f.transfers ? `환승 ${f.transfers}회` : '환승 없음'} · 소요 ${durationText(f.total)} · ${fm(f.arrive)} 도착</div>` +
+    (f.tightest !== null
+      ? `<div class="route-meta"><span class="slack ${tight ? 'tight' : 'ok'}">가장 빠듯한 환승 여유 ${f.tightest}분</span></div>`
+      : '') +
+    `</div><div class="route-leave"><small>일어나기</small><span class="st" id="rs${i}"></span></div></div>`
+  const body = timelineHtml(p, trip, ai)
+  return collapsible
+    ? `<li class="route alt" id="r${i}"><details><summary>${head}</summary>${body}</details></li>`
+    : `<li class="route" id="r${i}">${head}${body}</li>`
 }
 
-// 보여 줄 경로가 없을 때의 안내. connected: 교통 정보 연결 여부
-export function routesEmptyHtml(trip, connected) {
+// plans: 늦게 출발할 수 있는 순서. startIndex: 첫 카드의 번호
+export function routeCardsHtml(plans, trip, ai, startIndex = 0, collapsible = false) {
+  return plans.map((p, k) => routeItem(p, startIndex + k, trip, ai, collapsible)).join('')
+}
+
+// 보여 줄 경로가 없을 때의 안내. connected: 교통 정보 연결 여부, note: 서버가 알려 준 이유
+export function routesEmptyHtml(trip, connected, note = '') {
   const from = trip && trip.from ? esc(trip.from.name) : '출발지'
-  const to = trip && trip.to ? esc(trip.to.name) : '도착지'
-  const msg = connected
+  const to = trip && trip.to ? esc(trip.to.isHome ? HOME_LABEL : trip.to.name) : '도착지'
+  const msg = note
+    ? esc(note)
+    : connected
     ? `오늘 밤 ${from}에서 ${to}까지 탈 수 있는 경로가 없어요.`
     : `교통 정보 연결이 끝나면 ${from}에서 ${to}까지 탈 수 있는 막차가 여기에 나와요.`
   return `<li class="route-empty">${msg}</li>`

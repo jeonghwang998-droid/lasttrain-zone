@@ -35,62 +35,134 @@
         <button type="button" id="tab-walk" aria-pressed="false">내 걸음</button>
       </div>
 
-      <!-- 나: 어디에서 어디까지 + 내 막차 역산 -->
+      <!-- 나: 집 설정 → 막차 알람 목록 → 경로 상세(지도, 추천, 다른 경로) -->
       <div id="view-me" class="view">
-        <!-- 등록해 둔 경로: 고르면 아래에 오늘 밤 막차가 나온다 -->
-        <section class="panel" id="route-list-panel" hidden>
-          <div class="panel-head">
-            <h2>내 막차 경로</h2>
-            <button type="button" class="btn btn-sm" id="routeAdd">+ 경로 등록</button>
+        <!-- 위치 기반 서비스 안내: 위치를 켜야 지도에 내 위치와 근처 역이 나온다 -->
+        <section class="panel loc-card" id="loc-card" hidden>
+          <div class="loc-icon" aria-hidden="true">📍</div>
+          <div class="loc-text">
+            <b id="locTitle">위치 기반 서비스를 켜 주세요</b>
+            <p id="locMsg">지금 있는 곳 근처의 지하철역을 찾고, 지도에 내 위치를 보여 드려요.</p>
           </div>
-          <ul class="my-routes" id="myRoutes"></ul>
+          <button type="button" class="btn btn-primary btn-sm" id="locEnable">위치 켜기</button>
         </section>
 
-        <!-- 등록하기: 어디에서 어디까지 -->
-        <section class="panel trip-ask" id="trip-ask">
-          <h2 id="tripTitle">어디에서 어디까지 갈까요?</h2>
-          <p class="trip-sub">자주 타는 경로를 등록해 두면 오늘 밤 탈 수 있는 막차를 환승까지 계산해요.</p>
-          <form id="trip-form" novalidate>
-            <div class="trip-fields">
-              <div class="trip-dots" aria-hidden="true"><i class="dot from"></i><i class="bar"></i><i class="dot to"></i></div>
-              <div class="trip-inputs">
-                <div class="place">
-                  <input type="text" id="fromInput" maxlength="40" autocomplete="off" placeholder="출발지 (역 이름이나 장소)" aria-label="출발지" />
-                  <ul class="suggest" id="fromSuggest" hidden></ul>
-                </div>
-                <div class="place">
-                  <input type="text" id="toInput" maxlength="40" autocomplete="off" placeholder="도착지 (집이나 내릴 역)" aria-label="도착지" />
-                  <ul class="suggest" id="toSuggest" hidden></ul>
-                </div>
-              </div>
-              <button type="button" class="swap" id="swapBtn" aria-label="출발지와 도착지 바꾸기">⇅</button>
-            </div>
-            <div class="station-pick">
-              <div class="sp-head">
-                <span class="sp-title">지하철역으로 고르기</span>
-                <div class="sp-target" role="group" aria-label="고를 대상">
-                  <button type="button" id="spFrom" aria-pressed="true">출발</button>
-                  <button type="button" id="spTo" aria-pressed="false">도착</button>
-                </div>
-              </div>
-              <div class="sp-selects">
-                <select id="spLine" aria-label="노선"><option value="">노선 선택</option></select>
-                <select id="spStation" aria-label="역" disabled><option value="">역 선택</option></select>
-              </div>
-              <p class="sp-msg" id="spMsg" role="status"></p>
-              <button type="button" class="btn btn-sm" id="spRetry" hidden>다시 불러오기</button>
-              <div class="sp-info" id="spInfo" hidden></div>
-            </div>
-            <input type="text" id="labelInput" class="label-input" maxlength="20" autocomplete="off" placeholder="경로 이름 (선택)" aria-label="경로 이름" />
-            <div class="btn-row two">
-              <button type="submit" class="btn btn-primary" id="tripSubmit">등록하기</button>
-              <button type="button" class="btn" id="tripCancel" hidden>취소</button>
-            </div>
-            <p class="err" id="tripErr" role="alert"></p>
+        <!-- ① 집 설정: 도착지는 기본이 우리집 -->
+        <section class="panel home-setup" id="home-setup" hidden>
+          <h2 id="homeTitle">집이 어디예요?</h2>
+          <p class="trip-sub">집을 등록해 두면 술자리가 어디든 집으로 가는 막차를 바로 알려 드려요.</p>
+          <form id="home-form" class="home-search" novalidate>
+            <input type="text" id="homeInput" maxlength="60" autocomplete="off" placeholder="집 주소나 건물 이름" aria-label="집 주소" />
+            <button type="submit" class="btn btn-primary">검색</button>
           </form>
+          <button type="button" class="btn btn-block" id="homeLocate">📍 현재 위치로 찾기</button>
+          <ul class="place-results" id="homeResults" hidden></ul>
+
+          <div id="homeStep2" hidden>
+            <div class="home-picked"><b id="homePickedName"></b><span id="homePickedAddr"></span></div>
+            <h3 class="sub-h">집에서 가까운 지하철역을 골라 주세요</h3>
+            <ul class="station-results" id="homeStations"></ul>
+            <p class="sp-msg" id="homeMsg" role="status"></p>
+            <details class="home-manual">
+              <summary>목록에 없으면 노선에서 직접 고르기</summary>
+              <div class="sp-selects">
+                <select id="homeLine" aria-label="노선"><option value="">노선 선택</option></select>
+                <select id="homeStation" aria-label="역" disabled><option value="">역 선택</option></select>
+              </div>
+            </details>
+            <div class="btn-row two">
+              <button type="button" class="btn btn-primary" id="homeSave" disabled>이 집으로 설정</button>
+              <button type="button" class="btn" id="homeCancel" hidden>취소</button>
+            </div>
+          </div>
+          <p class="err" id="homeErr" role="alert"></p>
         </section>
 
-        <div id="trip-result" class="stack-lg" hidden>
+        <!-- ② 목록: 막차 알람 (아이폰 알람처럼 경로마다 스위치) -->
+        <div id="me-list" hidden>
+          <section class="panel home-chip" id="home-chip">
+            <div class="hc-icon" aria-hidden="true">🏠</div>
+            <div class="hc-text"><b>우리집</b><span id="homeLabel"></span></div>
+            <button type="button" class="btn btn-sm" id="homeEdit">변경</button>
+          </section>
+
+          <section class="panel" id="alarm-panel">
+            <div class="panel-head">
+              <h2>막차 알람</h2>
+              <button type="button" class="btn btn-sm" id="routeAdd">+ 경로 추가</button>
+            </div>
+            <ul class="alarm-list" id="myRoutes"></ul>
+          </section>
+
+          <!-- 등록하기: 출발은 근처 역, 도착은 기본이 우리집 -->
+          <section class="panel trip-ask" id="trip-ask" hidden>
+            <h2 id="tripTitle">어디서 출발할까요?</h2>
+            <p class="trip-sub">지금 있는 곳 근처 지하철역을 골라 주세요. 도착은 우리집으로 등록돼요.</p>
+            <form id="trip-form" novalidate>
+              <div class="trip-fields">
+                <div class="trip-dots" aria-hidden="true"><i class="dot from"></i><i class="bar"></i><i class="dot to"></i></div>
+                <div class="trip-inputs">
+                  <div class="place">
+                    <input type="text" id="fromInput" maxlength="40" autocomplete="off" placeholder="출발할 지하철역" aria-label="출발지" />
+                    <ul class="suggest" id="fromSuggest" hidden></ul>
+                  </div>
+                  <div class="place" id="toWrap">
+                    <div class="to-home" id="toHomeChip"><span>🏠 우리집</span><small id="toHomeLabel"></small></div>
+                    <input type="text" id="toInput" maxlength="40" autocomplete="off" placeholder="도착지 (장소나 지하철역)" aria-label="도착지" hidden />
+                    <ul class="suggest" id="toSuggest" hidden></ul>
+                  </div>
+                </div>
+                <div class="to-mode" role="group" aria-label="도착지 종류">
+                  <button type="button" id="toHome" aria-pressed="true">집</button>
+                  <button type="button" id="toOther" aria-pressed="false">다른 곳</button>
+                </div>
+              </div>
+
+              <div class="nearby" id="nearbyBox">
+                <div class="sp-head"><span class="sp-title">내 근처 지하철역</span></div>
+                <div class="chips-row" id="nearby"></div>
+              </div>
+
+              <div class="station-pick">
+                <div class="sp-head">
+                  <span class="sp-title">노선에서 고르기</span>
+                  <div class="sp-target" role="group" aria-label="고를 대상">
+                    <button type="button" id="spFrom" aria-pressed="true">출발</button>
+                    <button type="button" id="spTo" aria-pressed="false">도착</button>
+                  </div>
+                </div>
+                <div class="sp-selects">
+                  <select id="spLine" aria-label="노선"><option value="">노선 선택</option></select>
+                  <select id="spStation" aria-label="역" disabled><option value="">역 선택</option></select>
+                </div>
+                <p class="sp-msg" id="spMsg" role="status"></p>
+                <button type="button" class="btn btn-sm" id="spRetry" hidden>다시 불러오기</button>
+                <div class="sp-info" id="spInfo" hidden></div>
+              </div>
+
+              <input type="text" id="labelInput" class="label-input" maxlength="20" autocomplete="off" placeholder="알람 이름 (선택)" aria-label="알람 이름" />
+              <div class="btn-row two">
+                <button type="submit" class="btn btn-primary" id="tripSubmit">등록하기</button>
+                <button type="button" class="btn" id="tripCancel" hidden>취소</button>
+              </div>
+              <p class="err" id="tripErr" role="alert"></p>
+            </form>
+          </section>
+        </div>
+
+        <!-- ③ 경로 상세 -->
+        <div id="me-detail" class="stack-lg" hidden>
+          <div class="detail-head">
+            <button type="button" class="icon-btn" id="detailBack" aria-label="목록으로">←</button>
+            <div class="dh-text"><h2 id="detailTitle"></h2><p id="detailSub"></p></div>
+            <button type="button" class="toggle" id="detailAlarm" aria-pressed="false" aria-label="이 경로 알람"></button>
+          </div>
+
+          <section class="panel map-panel">
+            <div id="routeMap" class="route-map" role="img" aria-label="출발역과 집 위치 지도"></div>
+            <p class="sp-msg" id="mapMsg"></p>
+          </section>
+
           <div class="panel hero">
             <div class="hero-top">
               <p class="lead" id="heroLead">막차 정보를 불러오는 중이에요</p>
@@ -109,6 +181,17 @@
             <div class="tracklabels"><span>1시간 전</span><span>출발 마지노선</span></div>
           </div>
 
+          <section class="panel" id="recoPanel">
+            <h2>추천 막차</h2>
+            <p class="note">환승 연결까지 따져서, 가장 늦게 출발해도 집에 갈 수 있는 경로예요. <span id="xferNote"></span></p>
+            <ul class="routes" id="routes"></ul>
+          </section>
+
+          <section class="panel" id="altPanel" hidden>
+            <h2>다른 경로</h2>
+            <p class="note">늦게 출발할 수 있는 순서예요. 눌러서 구간별 막차와 환승 여유를 볼 수 있어요.</p>
+            <ul class="routes" id="alts"></ul>
+          </section>
 
           <section class="panel" id="lastPanel" hidden>
             <h2>출발역 막차</h2>
@@ -123,7 +206,7 @@
                 <div class="t">AI 지연 보정</div>
                 <div class="s">지연 예측 모델과 내 걸음 속도를 반영해요</div>
               </div>
-              <button type="button" class="toggle" id="ai" aria-pressed="true" aria-label="AI 지연 보정"></button>
+              <button type="button" class="toggle" id="ai" aria-pressed="false" aria-label="AI 지연 보정"></button>
             </div>
             <div class="field">
               <label>오늘</label>
@@ -147,11 +230,13 @@
                 <div class="rangeval" id="bufferVal"></div>
               </div>
             </div>
-          </section>
-
-          <section class="panel">
-            <h2>탈 수 있는 막차</h2>
-            <ul class="routes" id="routes"></ul>
+            <div class="field">
+              <label for="xfer">환승 여유</label>
+              <div>
+                <input type="range" id="xfer" min="0" max="10" step="1" value="3" />
+                <div class="rangeval" id="xferVal"></div>
+              </div>
+            </div>
           </section>
         </div>
       </div>

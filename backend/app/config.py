@@ -19,6 +19,9 @@ class Config:
 
     # 공공데이터포털 인증키. Encoding 키(%가 들어 있는 것)를 넣어도 requests 가 다시 인코딩하지 않도록 풀어서 쓴다
     DATA_GO_KR_KEY = unquote(os.getenv("DATA_GO_KR_KEY", ""))
+    # 한국철도공사 철도 공공데이터 포털(data.kric.go.kr) 서비스키. 계정 하나에 키 하나로 모든 API 를 쓴다
+    # (도시철도 전체노선정보: 노선별 역 순서, 역사별 운행시각표: 열차번호 시간표)
+    KRIC_API_KEY = unquote(os.getenv("KRIC_API_KEY", ""))
     ODSAY_API_KEY = os.getenv("ODSAY_API_KEY", "")
     KMA_API_KEY = os.getenv("KMA_API_KEY", "")
 
@@ -40,4 +43,6 @@ class Config:
     SUBWAY_CATALOG_TTL_SEC = 7 * 24 * 3600  # 노선/역 목록은 자주 안 바뀐다
     LAST_TRAIN_CACHE_TTL_SEC = 6 * 3600     # 역별 시간표(막차)
     SUBWAY_CATALOG_PATH = DATA_DIR / "subway_catalog.json"  # 받아 둔 노선/역 목록 (git 제외)
+    # 같은 이름 역에서 다른 노선으로 갈아탈 때 걷는다고 보는 시간(분). KRIC 자료에 환승 시간이 없어서 둔 가정값
+    TRANSFER_WALK_MIN = 4
     ALERT_OFFSETS_MIN = (30, 10, 0)

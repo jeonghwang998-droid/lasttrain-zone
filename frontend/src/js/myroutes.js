@@ -4,7 +4,7 @@
 import { supabase } from './supabase.js'
 
 const COLS =
-  'id, label, from_name, from_lat, from_lng, from_station_id, from_line, to_name, to_lat, to_lng, to_station_id, to_line'
+  'id, label, from_name, from_lat, from_lng, from_station_id, from_line, to_name, to_lat, to_lng, to_station_id, to_line, to_home, alarm_on'
 
 // 서버 오류는 화면에 그대로 보이지 않게 한국어 문구로 바꾼다
 export function routeError(error) {
@@ -24,14 +24,23 @@ const placeOf = (name, lat, lng, stationId, line) => ({
   ...(stationId ? { stationId, line } : {}),
 })
 
-// 화면과 transit.js 가 쓰는 { from, to } 모양으로
-export function toTrip(r) {
-  return {
-    from: placeOf(r.from_name, r.from_lat, r.from_lng, r.from_station_id, r.from_line),
-    to: placeOf(r.to_name, r.to_lat, r.to_lng, r.to_station_id, r.to_line),
-  }
+// 화면과 transit.js 가 쓰는 { from, to } 모양으로.
+// 도착지가 '내 집'인 경로(to_home)는 지금 설정된 집을 따라간다. 집을 바꾸면 경로도 같이 바뀐다
+// home: { name, lat, lng, station: { id, label, line } | null } (loadHome 결과)
+export function toTrip(r, home) {
+  const to =
+    r.to_home && home
+      ? {
+          name: home.station ? home.station.label : home.name,
+          ...(home.lat == null ? {} : { lat: home.lat, lng: home.lng }),
+          ...(home.station ? { stationId: home.station.id, line: home.station.line } : {}),
+          isHome: true,
+        }
+      : placeOf(r.to_name, r.to_lat, r.to_lng, r.to_station_id, r.to_line)
+  return { from: placeOf(r.from_name, r.from_lat, r.from_lng, r.from_station_id, r.from_line), to }
 }
 
+// to.isHome 이면 도착지는 집을 따라가므로 이름과 좌표는 저장하지 않는다 (to_home 만 켠다)
 const toRow = ({ label, from, to }) => ({
   label,
   from_name: from.name,
@@ -44,6 +53,7 @@ const toRow = ({ label, from, to }) => ({
   to_lng: to.lng ?? null,
   to_station_id: to.stationId ?? null,
   to_line: to.line ?? null,
+  to_home: Boolean(to.isHome),
 })
 
 // 등록한 순서대로
@@ -72,5 +82,11 @@ export async function editRoute(id, route) {
 
 export async function removeRoute(id) {
   const { error } = await supabase.from('user_routes').delete().eq('id', id)
+  if (error) throw error
+}
+
+// 경로 알람을 켜거나 끈다 (아이폰 알람처럼 경로마다 스위치)
+export async function setAlarm(id, on) {
+  const { error } = await supabase.from('user_routes').update({ alarm_on: on }).eq('id', id)
   if (error) throw error
 }
