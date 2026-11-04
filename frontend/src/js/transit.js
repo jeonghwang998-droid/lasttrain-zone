@@ -8,31 +8,21 @@ import { api } from './api.js'
 import { S } from './state.js'
 import * as Kakao from './kakao.js'
 import * as Subway from './subway.js'
+import { distanceM, WALK_DETOUR } from './geo.js'
 
 export const TRANSIT_CONNECTED = true
 
 const DEST_STATION_RADIUS_M = 1500 // 도착지에서 이 거리 안의 역을 도착 후보로 본다
 const DEST_STATION_LIMIT = 8
-const WALK_DETOUR = 1.3 // 직선거리를 실제 걷는 거리로 바꾸는 계수 (backend core/last_train.py 와 같다)
 
 let note = '' // 경로가 없을 때 그 이유 (화면 안내용)
 export const routesNote = () => note
-
-// 두 좌표 사이 직선거리(m)
-function distanceM(a, b) {
-  const r = 6371000
-  const toRad = (d) => (d * Math.PI) / 180
-  const dLat = toRad(b.lat - a.lat)
-  const dLng = toRad(b.lng - a.lng)
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
-  return 2 * r * Math.asin(Math.sqrt(h))
-}
 
 const walkMinutes = (meters) => Math.max(0, Math.round((meters * WALK_DETOUR) / (S.walkSpeed || S.walkDefault || 1)))
 
 // 도착 후보 역: [{ id: 공공데이터 역 id, walk: 그 역에서 도착지까지 걷는 분 }]
 // walk 는 서버가 어느 역에서 내릴지 고르는 데만 쓴다 (화면에는 보이지 않는다)
-async function destinationStations(to) {
+export async function destinationStations(to) {
   const out = new Map()
   if (to.stationId) out.set(to.stationId, 0)
   if (to.lat != null && to.lng != null) {
@@ -78,6 +68,14 @@ export async function fetchRoutes(trip, myPos) {
   }
   const res = await api('/api/routes', { method: 'POST', body: JSON.stringify({ from: trip.from.stationId, to: targets }) })
   note = res.note || ''
-  const walkM = myPos && trip.from.lat != null ? Math.round(distanceM(myPos, trip.from) * WALK_DETOUR) : 0
-  return res.routes.map((r) => ({ ...r, walkM }))
+  return applyWalk(res.routes, myPos, trip.from)
+}
+
+// 지금 위치에서 첫 탑승역까지 걷는 거리(m)를 경로마다 넣는다. 위치가 바뀌면 다시 불러 일어날 시각을 고친다
+export function applyWalk(routes, myPos, from) {
+  const walkM = myPos && from.lat != null ? Math.round(distanceM(myPos, from) * WALK_DETOUR) : 0
+  routes.forEach((r) => {
+    r.walkM = walkM
+  })
+  return routes
 }

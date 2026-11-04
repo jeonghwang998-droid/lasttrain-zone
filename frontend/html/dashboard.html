@@ -25,7 +25,7 @@
 
     <main class="page">
       <header class="topbar">
-        <h1>🚇 막차 자기장</h1>
+        <h1><img class="brand-mark" src="../public/icons/icon-192.png" alt="" />막차 자기장</h1>
         <div class="auth-area" id="authArea"></div>
       </header>
 
@@ -39,7 +39,7 @@
       <div id="view-me" class="view">
         <!-- 위치 기반 서비스 안내: 위치를 켜야 지도에 내 위치와 근처 역이 나온다 -->
         <section class="panel loc-card" id="loc-card" hidden>
-          <div class="loc-icon" aria-hidden="true">📍</div>
+          <div class="loc-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.6-6-11a6 6 0 1 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.3"/></svg></div>
           <div class="loc-text">
             <b id="locTitle">위치 기반 서비스를 켜 주세요</b>
             <p id="locMsg">지금 있는 곳 근처의 지하철역을 찾고, 지도에 내 위치를 보여 드려요.</p>
@@ -55,7 +55,7 @@
             <input type="text" id="homeInput" maxlength="60" autocomplete="off" placeholder="집 주소나 건물 이름" aria-label="집 주소" />
             <button type="submit" class="btn btn-primary">검색</button>
           </form>
-          <button type="button" class="btn btn-block" id="homeLocate">📍 현재 위치로 찾기</button>
+          <button type="button" class="btn btn-block" id="homeLocate"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.6-6-11a6 6 0 1 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.3"/></svg>현재 위치로 찾기</button>
           <ul class="place-results" id="homeResults" hidden></ul>
 
           <div id="homeStep2" hidden>
@@ -81,7 +81,7 @@
         <!-- ② 목록: 막차 알람 (아이폰 알람처럼 경로마다 스위치) -->
         <div id="me-list" hidden>
           <section class="panel home-chip" id="home-chip">
-            <div class="hc-icon" aria-hidden="true">🏠</div>
+            <div class="hc-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg></div>
             <div class="hc-text"><b>우리집</b><span id="homeLabel"></span></div>
             <button type="button" class="btn btn-sm" id="homeEdit">변경</button>
           </section>
@@ -107,7 +107,7 @@
                     <ul class="suggest" id="fromSuggest" hidden></ul>
                   </div>
                   <div class="place" id="toWrap">
-                    <div class="to-home" id="toHomeChip"><span>🏠 우리집</span><small id="toHomeLabel"></small></div>
+                    <div class="to-home" id="toHomeChip"><span>우리집</span><small id="toHomeLabel"></small></div>
                     <input type="text" id="toInput" maxlength="40" autocomplete="off" placeholder="도착지 (장소나 지하철역)" aria-label="도착지" hidden />
                     <ul class="suggest" id="toSuggest" hidden></ul>
                   </div>
@@ -159,8 +159,29 @@
           </div>
 
           <section class="panel map-panel">
-            <div id="routeMap" class="route-map" role="img" aria-label="출발역과 집 위치 지도"></div>
+            <div id="routeMap" class="route-map" role="img" aria-label="내 위치, 출발역, 귀가 가능 구역 지도"></div>
+            <!-- 막차 자기장: 지금 걸어가서 타면 집에 갈 수 있는 구역. 시간이 지나면 줄어든다 -->
+            <div class="zone-bar">
+              <div class="zone-status" id="zoneStatus" role="status"></div>
+              <div class="zone-legend" aria-hidden="true">
+                <span><i class="calm"></i>여유</span><span><i class="warn"></i>30분 이내</span><span><i class="danger"></i>10분 이내</span>
+              </div>
+            </div>
             <p class="sp-msg" id="mapMsg"></p>
+          </section>
+
+          <!-- 지금 위치에서 출발역까지 걷기: 위치가 바뀌면 바로 다시 계산한다 -->
+          <section class="panel walk-card" id="walkCard" hidden>
+            <div class="wk-row">
+              <div class="wk-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h5a3 3 0 0 0 0-6h-2a3 3 0 0 1 0-6h5" stroke-dasharray="2 2.6"/></svg></div>
+              <div class="wk-text">
+                <b id="walkTitle"></b>
+                <span id="walkSub"></span>
+              </div>
+              <div class="wk-min"><b id="walkMin">--</b><small>분</small></div>
+            </div>
+            <p class="wk-train" id="walkTrain"></p>
+            <p class="note">길 대신 직선거리로 어림한 값이에요. 실제로는 조금 더 걸릴 수 있어요.</p>
           </section>
 
           <div class="panel hero">
@@ -276,35 +297,50 @@
           </section>
         </div>
 
-        <!-- 모임 안: 모임 이름, 내 막차 입력, 멤버들의 막차 -->
-        <div id="group-room" hidden>
-          <section class="panel">
-            <div class="room-head">
+        <!-- 모임 안: 다 같이 일어날 시각, 멤버(출발 시각, 귀가 완료), 내 막차 -->
+        <div id="group-room" class="stack-lg" hidden>
+          <div class="detail-head">
+            <button type="button" class="icon-btn" id="btnBack" aria-label="모임 목록으로">←</button>
+            <div class="dh-text">
               <h2 id="roomName"></h2>
-              <button type="button" class="btn btn-sm" id="btnBack">모임 목록</button>
+              <button type="button" class="code-chip" id="roomCodeChip" aria-label="초대 코드 공유"></button>
             </div>
+            <button type="button" class="toggle" id="roomAlarm" aria-pressed="false" aria-label="다 같이 일어날 시각 알람"></button>
+          </div>
 
-            <form id="lt-form" class="stack" novalidate>
-              <div class="seg" role="group" aria-label="교통수단">
-                <button type="button" id="mode-subway" aria-pressed="true">지하철</button>
-                <button type="button" id="mode-bus" aria-pressed="false">버스</button>
-              </div>
-              <input type="text" id="ltLabel" maxlength="40" placeholder="노선이나 정류장 (선택)" aria-label="노선이나 정류장" />
-              <label class="time-field">
-                <span>막차 시각</span>
-                <input type="time" id="ltTime" aria-label="막차 시각" />
-              </label>
-              <div class="btn-row two">
-                <button type="submit" class="btn btn-primary">막차 저장</button>
-                <button type="button" class="btn" id="ltClear" hidden>입력 지우기</button>
-              </div>
-            </form>
-            <p class="err" id="roomErr" role="alert"></p>
+          <!-- 가장 빠른 마지노선: 알람을 켠 멤버 모두에게 이 시각에 맞춰 알린다 -->
+          <section class="panel hero group-hero">
+            <p class="lead" id="gLead">다 같이 일어날 시각</p>
+            <div class="big" id="gTime">--:--</div>
+            <p class="count" id="gCount"></p>
+            <p class="g-who" id="gWho"></p>
           </section>
 
           <section class="panel">
-            <h2>멤버의 막차</h2>
-            <ul class="people" id="people"></ul>
+            <h2>멤버</h2>
+            <ul class="people room-people" id="people"></ul>
+            <button type="button" class="btn btn-primary btn-block" id="btnArrived">집에 도착했어요</button>
+            <p class="err" id="roomErr" role="alert"></p>
+          </section>
+
+          <!-- 내 막차: 도착지는 내 집이나 고른 역. 집 위치는 다른 멤버에게 보이지 않고 출발 시각만 공유된다 -->
+          <section class="panel">
+            <div class="panel-head">
+              <h2>내 막차</h2>
+              <div class="to-mode inline" role="group" aria-label="내 도착지">
+                <button type="button" id="roomDestHome" aria-pressed="true">집</button>
+                <button type="button" id="roomDestOther" aria-pressed="false">다른 역</button>
+              </div>
+            </div>
+            <div class="place" id="roomDestWrap" hidden>
+              <input type="text" id="roomDestInput" maxlength="40" autocomplete="off" placeholder="내릴 지하철역 검색" aria-label="내릴 지하철역" />
+              <ul class="suggest" id="roomDestSuggest" hidden></ul>
+            </div>
+            <p class="sp-msg" id="myPlanMsg" role="status"></p>
+            <button type="button" class="btn btn-sm" id="roomLocBtn" hidden>위치 켜기</button>
+            <div id="roomMap" class="route-map room-map" hidden></div>
+            <ul class="routes" id="myRoomRoute"></ul>
+            <p class="note">출발 시각만 모임에 공유돼요. 집 위치는 다른 멤버에게 보이지 않아요.</p>
           </section>
 
           <button type="button" class="btn btn-danger btn-block" id="btnLeave">모임 나가기</button>

@@ -42,3 +42,28 @@ export function getPosition() {
     )
   })
 }
+
+// 위치를 계속 따라간다. 바뀔 때마다 onChange({ lat, lng, accuracy }), 실패하면 onError(안내 문구).
+// 반환: 그만 따라가는 함수 (화면을 떠날 때 꼭 부른다. 배터리를 아끼려고)
+export function watchPosition(onChange, onError) {
+  if (!geoSupported()) return () => {}
+  const id = navigator.geolocation.watchPosition(
+    (pos) => onChange({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+    (err) => onError && onError(ERRORS[err.code] || ERRORS[2]),
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 },
+  )
+  return () => navigator.geolocation.clearWatch(id)
+}
+
+// 두 좌표 사이 직선거리(m)
+export function distanceM(a, b) {
+  const r = 6371000
+  const toRad = (d) => (d * Math.PI) / 180
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * r * Math.asin(Math.sqrt(h))
+}
+
+// 걸어서 가는 거리: 길은 직선이 아니라서 직선거리에 이 계수를 곱해 어림한다 (backend core/last_train.py 와 같다)
+export const WALK_DETOUR = 1.3

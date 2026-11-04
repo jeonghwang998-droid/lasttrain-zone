@@ -15,82 +15,308 @@
     <link rel="icon" href="./public/icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./public/icons/icon-192.png" />
     <link rel="stylesheet" href="./css/global.css" />
+    <link rel="stylesheet" href="./css/landing.css" />
   </head>
-  <body>
-    <main class="page landing">
-      <header class="topbar">
-        <h1>🚇 막차 자기장</h1>
-        <div class="auth-area">
+  <body class="lp">
+    <header class="lp-nav">
+      <div class="lp-wrap">
+        <a class="lp-brand" href="./"><img src="./public/icons/icon-192.png" alt="" />막차 자기장</a>
+        <nav class="lp-links" aria-label="페이지 안내">
+          <a href="#how">이용 방법</a>
+          <a href="#features">기능</a>
+          <a href="#tech">기술</a>
+        </nav>
+        <div class="lp-auth">
           <a href="./html/login.html" class="btn btn-sm">로그인</a>
           <a href="./html/signup.html" class="btn btn-sm btn-primary">회원가입</a>
         </div>
-      </header>
+      </div>
+    </header>
 
-      <section class="landing-hero">
-        <div class="auth-logo" aria-hidden="true">🚇</div>
-        <h2>놀다가 막차 놓치는 일,<br />이제 그만</h2>
-        <p>
-          모임 중 <strong>지금 어디에 있어야 집에 갈 수 있는지</strong>를<br />
-          지도 위 자기장으로 보여주는 귀가 도우미예요.
-        </p>
-        <div class="landing-cta">
-          <a href="./html/signup.html" class="btn btn-primary btn-block">무료로 시작하기</a>
-          <a href="./html/login.html" class="btn btn-block">이미 계정이 있어요</a>
+    <main>
+      <!-- 첫 단 -->
+      <section class="lp-hero">
+        <div class="lp-wrap">
+          <div>
+            <p class="lp-eyebrow">수도권 지하철 귀가 도우미</p>
+            <h1><span class="nw">놀다가 막차 놓치는 일,</span><br /><em>이제 그만</em></h1>
+            <p class="lp-lead">
+              모임 중 <strong>지금 어디에 있어야 집에 갈 수 있는지</strong>를<br />
+              지도 위 자기장으로 보여주는 귀가 도우미예요.
+            </p>
+            <div class="lp-cta">
+              <a href="./html/signup.html" class="btn btn-primary">무료로 시작하기</a>
+              <a href="./html/login.html" class="btn">이미 계정이 있어요</a>
+            </div>
+            <ul class="lp-facts">
+              <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>가입비, 이용료 없음</li>
+              <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>설치 없이 웹에서 바로</li>
+              <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>휴대폰 홈 화면에 추가 가능</li>
+            </ul>
+          </div>
+
+          <figure class="lp-shot" style="margin: 0">
+            <div>
+              <div class="lp-phone">
+                <div class="lp-screen">
+                  <svg class="map" viewBox="0 0 276 586" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                    <rect width="276" height="586" fill="#eef1f5"/>
+                    <!-- 강, 공원 -->
+                    <path d="M-10 470 C60 440 120 500 190 470 S280 430 300 450 V600 H-10z" fill="#dbe7f3"/>
+                    <rect x="170" y="60" width="80" height="60" rx="10" fill="#e3eee2"/>
+                    <!-- 큰길 -->
+                    <g stroke="#fff" stroke-width="9" fill="none" stroke-linecap="round">
+                      <path d="M-10 150 H290"/><path d="M-10 330 H290"/><path d="M70 -10 V600"/><path d="M200 -10 V600"/>
+                      <path d="M-10 60 L290 260"/>
+                    </g>
+                    <g stroke="#fff" stroke-width="4" fill="none">
+                      <path d="M-10 240 H290"/><path d="M-10 410 H290"/><path d="M135 -10 V600"/><path d="M20 -10 V600"/><path d="M250 -10 V600"/>
+                    </g>
+                    <!-- 지하철 노선 -->
+                    <path d="M-10 268 C80 268 120 220 160 200 S260 170 300 170" stroke="#0052a4" stroke-width="4" fill="none" opacity=".75"/>
+                    <path d="M150 -10 C150 80 162 150 160 200 S150 330 140 600" stroke="#8fc31f" stroke-width="4" fill="none" opacity=".85"/>
+                    <!-- 자기장 -->
+                    <g class="zone-ring">
+                      <circle cx="122" cy="236" r="118" fill="#0052a4" fill-opacity=".08" stroke="#0052a4" stroke-width="1.5" stroke-dasharray="5 4"/>
+                    </g>
+                    <circle cx="122" cy="236" r="46" fill="#0052a4" fill-opacity=".05"/>
+                    <!-- 역 -->
+                    <circle cx="160" cy="200" r="7" fill="#fff" stroke="#0052a4" stroke-width="3"/>
+                    <rect x="170" y="186" width="46" height="22" rx="11" fill="#fff" stroke="#dde3ea"/>
+                    <text x="193" y="201" font-size="11" font-weight="700" fill="#152033" text-anchor="middle" font-family="inherit">부평역</text>
+                    <circle cx="52" cy="268" r="5" fill="#fff" stroke="#0052a4" stroke-width="2.5"/>
+                    <circle cx="146" cy="380" r="5" fill="#fff" stroke="#8fc31f" stroke-width="2.5"/>
+                    <!-- 걸어갈 길 -->
+                    <path d="M108 252 L108 240 L150 240 L158 208" stroke="#152033" stroke-width="2.5" fill="none" stroke-dasharray="1 5" stroke-linecap="round"/>
+                    <!-- 내 위치 -->
+                    <circle cx="108" cy="254" r="16" fill="#0052a4" fill-opacity=".18"/>
+                    <circle cx="108" cy="254" r="7" fill="#0052a4" stroke="#fff" stroke-width="3"/>
+                  </svg>
+
+                  <div class="lp-sheet">
+                    <p class="k">막차 타려면 이때 일어나기</p>
+                    <p class="t">23:17</p>
+                    <p class="c">38분 남았어요</p>
+                    <div class="lp-chips">
+                      <span style="background: #0052a4">1호선</span><i>›</i>
+                      <span style="background: #8fc31f">서해선</span>
+                      <small>환승 1번</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <figcaption class="lp-caption">예시 화면이에요</figcaption>
+            </div>
+
+            <div class="lp-float f1">
+              <span class="muted">가까운 역까지</span>
+              <b>부평역 · 걸어서 6분</b>
+            </div>
+            <div class="lp-float f2">
+              <span class="muted">우리 테이블 마지노선</span>
+              <b>23:05 · 모두에게 알림</b>
+            </div>
+          </figure>
         </div>
       </section>
 
-      <section class="panel">
-        <h2>이런 걸 해줘요</h2>
-        <ul class="feature-list">
-          <li>
-            <span class="feature-ico" aria-hidden="true">⏰</span>
-            <div>
-              <div class="t">막차 시각 역산</div>
-              <div class="s">“이때 일어나면 막차 탑니다”를 현재 위치와 집 기준으로 계산해요.</div>
-            </div>
-          </li>
-          <li>
-            <span class="feature-ico" aria-hidden="true">🧲</span>
-            <div>
-              <div class="t">귀가 자기장</div>
-              <div class="s">지도 위에 집에 갈 수 있는 구역을 보여주고, 시간이 지나면 점점 좁혀져요.</div>
-            </div>
-          </li>
-          <li>
-            <span class="feature-ico" aria-hidden="true">👥</span>
-            <div>
-              <div class="t">우리 테이블</div>
-              <div class="s">모임에서 누가 먼저 일어나야 하는지 한눈에 확인해요.</div>
-            </div>
-          </li>
-          <li>
-            <span class="feature-ico" aria-hidden="true">🤖</span>
-            <div>
-              <div class="t">AI 지연 보정</div>
-              <div class="s">지연 예측 모델과 내 걸음 속도를 반영해 더 정확하게 알려드려요.</div>
-            </div>
-          </li>
-          <li>
-            <span class="feature-ico" aria-hidden="true">🔔</span>
-            <div>
-              <div class="t">출발 알림</div>
-              <div class="s">30분 전, 10분 전, 출발 시각에 알림으로 챙겨드려요.</div>
-            </div>
-          </li>
-        </ul>
+      <!-- 이용 방법 -->
+      <section class="lp-sec" id="how">
+        <div class="lp-wrap">
+          <div class="lp-head center">
+            <p class="lp-kicker">이용 방법</p>
+            <h2>세 번이면 준비 끝</h2>
+            <p>처음 한 번만 설정해 두면, 모임 자리에서는 열어 보기만 하면 돼요.</p>
+          </div>
+          <ol class="lp-steps">
+            <li><b>회원가입</b><span>닉네임과 이메일로 가입해요.</span></li>
+            <li><b>집 위치 등록</b><span>집이 어디인지 한 번만 알려 주세요. 다른 멤버에게는 공개되지 않아요.</span></li>
+            <li><b>모임에서 확인</b><span>지금 일어나야 하는 시각, 탈 수 있는 막차, 갈 수 있는 구역을 바로 볼 수 있어요.</span></li>
+          </ol>
+        </div>
       </section>
 
-      <section class="panel">
-        <h2>사용 방법</h2>
-        <ol class="steps-list">
-          <li><b>회원가입</b> 닉네임과 이메일로 가입해요.</li>
-          <li><b>집 위치 등록</b> 집이 어디인지 한 번만 알려주세요. 다른 멤버에게는 공개되지 않아요.</li>
-          <li><b>대시보드 확인</b> 지금 일어나야 하는 시각과 탈 수 있는 막차를 바로 볼 수 있어요.</li>
-        </ol>
+      <!-- 기능 -->
+      <section class="lp-sec alt" id="features">
+        <div class="lp-wrap">
+          <div class="lp-head">
+            <p class="lp-kicker">기능</p>
+            <h2>지도 한 장, 시간 하나로<br />귀가 걱정을 정리해요</h2>
+          </div>
+
+          <div class="lp-split">
+            <div>
+              <h3>시간이 갈수록 좁아지는<br />막차 자기장</h3>
+              <p>지금 있는 곳에서 걸어가 막차를 탈 수 있는 구역을 지도 위에 그려요. 시간이 지나면 구역이 점점 줄어들고, 색으로 여유를 알려 줘요.</p>
+              <ul class="lp-points">
+                <li>내 위치에서 가장 가까운 역과 걸어가는 시간</li>
+                <li>걸으면서 움직이면 위치를 따라 다시 계산</li>
+                <li>30분, 10분 남으면 색이 바뀌어요</li>
+              </ul>
+            </div>
+            <div class="lp-art">
+              <svg class="map" viewBox="0 0 480 320" aria-hidden="true">
+                <rect width="480" height="320" fill="#eef1f5"/>
+                <g stroke="#fff" stroke-width="8" fill="none"><path d="M-10 110 H490"/><path d="M-10 230 H490"/><path d="M120 -10 V330"/><path d="M340 -10 V330"/></g>
+                <g stroke="#fff" stroke-width="3" fill="none"><path d="M-10 50 H490"/><path d="M-10 170 H490"/><path d="M-10 290 H490"/><path d="M60 -10 V330"/><path d="M230 -10 V330"/><path d="M420 -10 V330"/></g>
+                <path d="M-10 200 C100 200 160 150 240 150 S380 120 490 90" stroke="#0052a4" stroke-width="4" fill="none" opacity=".7"/>
+                <circle cx="240" cy="160" r="140" fill="#0052a4" fill-opacity=".05" stroke="#0052a4" stroke-width="1.5" stroke-dasharray="5 4"/>
+                <g class="zone-ring slow"><circle cx="240" cy="160" r="92" fill="#b86e00" fill-opacity=".07" stroke="#b86e00" stroke-width="1.5" stroke-dasharray="5 4"/></g>
+                <circle cx="240" cy="160" r="44" fill="#d92d3a" fill-opacity=".08" stroke="#d92d3a" stroke-width="1.5" stroke-dasharray="5 4"/>
+                <!-- 갈 수 있는 역 / 못 가는 역 -->
+                <circle cx="290" cy="146" r="7" fill="#0052a4" stroke="#fff" stroke-width="2.5"/>
+                <circle cx="150" cy="182" r="7" fill="#0052a4" stroke="#fff" stroke-width="2.5"/>
+                <circle cx="440" cy="94" r="6" fill="#fff" stroke="#9aa5b4" stroke-width="2.5"/>
+                <circle cx="30" cy="200" r="6" fill="#fff" stroke="#9aa5b4" stroke-width="2.5"/>
+                <circle cx="240" cy="160" r="15" fill="#0052a4" fill-opacity=".18"/>
+                <circle cx="240" cy="160" r="7" fill="#0052a4" stroke="#fff" stroke-width="3"/>
+              </svg>
+              <div class="lp-legend">
+                <span><i style="background: #0052a4"></i>여유 있어요</span>
+                <span><i style="background: #b86e00"></i>30분 안쪽</span>
+                <span><i style="background: #d92d3a"></i>10분 안쪽</span>
+                <span><i style="background: #fff; border: 2px solid #9aa5b4"></i>이미 못 가는 역</span>
+              </div>
+              <p class="lp-caption">예시 화면이에요</p>
+            </div>
+          </div>
+
+          <div class="lp-split rev">
+            <div>
+              <h3>몇 시에 일어나서<br />어떤 열차를 타는지까지</h3>
+              <p>집 근처 역에 들어가는 마지막 열차부터 거꾸로 따져서, 지금 자리에서 일어나야 하는 시각과 갈아탈 열차를 한 장으로 보여 줘요.</p>
+              <ul class="lp-points">
+                <li>환승이 적고 오래 머물 수 있는 경로를 먼저 추천</li>
+                <li>돌아가는 비효율 경로는 빼고 쓸 만한 대안만</li>
+                <li>환승할 역과 열차 시각을 차례대로</li>
+              </ul>
+            </div>
+            <div class="lp-art">
+              <div class="lp-tl-head">
+                <div>
+                  <p class="k">추천 경로 · 환승 1번</p>
+                  <p class="t">23:17 <small>일어나기</small></p>
+                </div>
+                <span class="lp-badge">막차</span>
+              </div>
+              <ol class="lp-tl">
+                <li class="walk"><time>23:17</time><div><b>지금 자리</b><span>부평역까지 걸어서 6분</span></div></li>
+                <li style="--c: #0052a4"><time>23:26</time><div><b>부평 <em style="background: #0052a4">1호선</em></b><span>소사까지 4개 역 · 23:39 도착</span></div></li>
+                <li class="walk"><time></time><div><span>갈아타기 4분</span></div></li>
+                <li style="--c: #8fc31f"><time>23:46</time><div><b>소사 <em style="background: #8fc31f">서해선</em></b><span>시흥대야까지 2개 역 · 23:51 도착</span></div></li>
+                <li class="end"><time>23:51</time><div><b>시흥대야 도착</b></div></li>
+              </ol>
+              <div class="lp-alt">
+                <span>다른 경로</span><b>23:05 일어나기</b><span>환승 2번</span>
+              </div>
+              <p class="lp-caption">예시 화면이에요</p>
+            </div>
+          </div>
+
+          <div class="lp-split">
+            <div>
+              <h3>모임에서는 가장 빠른 사람에게<br />모두 맞춰요</h3>
+              <p>초대 코드로 우리 테이블을 만들면, 멤버마다 자기 집 기준으로 계산한 시각 중 가장 이른 시각이 모임의 마지노선이 돼요. 그때가 되면 모든 멤버에게 함께 알려요.</p>
+              <ul class="lp-points">
+                <li>누가 먼저 일어나야 하는지 한눈에</li>
+                <li>집 주소는 다른 멤버에게 보이지 않아요</li>
+                <li>집에 도착하면 “귀가 완료”로 서로 안심</li>
+              </ul>
+            </div>
+            <div class="lp-art">
+              <div class="lp-tl-head">
+                <div>
+                  <p class="k">우리 테이블 마지노선</p>
+                  <p class="t">23:05</p>
+                </div>
+                <span class="lp-badge warn">27분 남음</span>
+              </div>
+              <ul class="lp-members">
+                <li><i class="m-dot first"></i><b>멤버 A</b><span>23:05</span></li>
+                <li><i class="m-dot"></i><b>나</b><span>23:17</span></li>
+                <li><i class="m-dot"></i><b>멤버 B</b><span>23:40</span></li>
+                <li><svg class="ico ok" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg><b>멤버 C</b><span class="muted">귀가 완료</span></li>
+              </ul>
+              <p class="lp-caption">예시 화면이에요</p>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <p class="note landing-foot">시간표는 시연용 가짜 데이터예요.</p>
+      <!-- 기술 -->
+      <section class="lp-sec" id="tech">
+        <div class="lp-wrap">
+          <div class="lp-head center">
+            <p class="lp-kicker">기술</p>
+            <h2>어떻게 계산하나요?</h2>
+            <p>어려운 이름이 붙어 있지만, 하는 일은 단순해요.</p>
+          </div>
+          <div class="lp-tech">
+            <article class="lp-card">
+              <div class="ico-box"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div>
+              <h4>막차 거꾸로 계산</h4>
+              <p class="tech-name">역방향 연결 탐색</p>
+              <p>집 근처 역에 들어오는 마지막 열차에서 출발해 시간표를 거꾸로 거슬러 올라가요. 그래서 “몇 시까지 일어나면 되는지”가 나와요.</p>
+            </article>
+            <article class="lp-card">
+              <div class="ico-box"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2.6"/><circle cx="12" cy="12" r="6" stroke-dasharray="2 2.2"/><circle cx="12" cy="12" r="9.3" opacity=".45"/></svg></div>
+              <h4>걸어서 닿는 범위</h4>
+              <p class="tech-name">도보 도달 반경</p>
+              <p>남은 시간과 걷는 속도로 갈 수 있는 거리를 구해요. 실제 길은 직선보다 돌아가니 그만큼 줄여서 그려요. 위치가 바뀌면 다시 계산해요.</p>
+            </article>
+            <article class="lp-card">
+              <div class="ico-box"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h5a3 3 0 0 0 0-6h-2a3 3 0 0 1 0-6h5"/></svg></div>
+              <h4>쓸 만한 경로만 고르기</h4>
+              <p class="tech-name">파레토 최적 경로</p>
+              <p>더 늦게 나가도 되는지, 더 빨리 도착하는지, 덜 갈아타는지를 비교해요. 셋 다 다른 경로보다 못하면 보여 주지 않아요.</p>
+            </article>
+            <article class="lp-card">
+              <div class="ico-box"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9h16M9 9v11"/></svg></div>
+              <h4>진짜 열차 시간표</h4>
+              <p class="tech-name">공공데이터</p>
+              <p>국가 철도 데이터에서 노선별 역 순서와 열차마다의 시각을 받아 써요. 평일과 주말·공휴일 시간표를 따로 계산해요.</p>
+            </article>
+            <article class="lp-card">
+              <div class="ico-box"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.4c1.9.8 3 2.7 3 5.6"/></svg></div>
+              <h4>모임 실시간 공유</h4>
+              <p class="tech-name">실시간 동기화</p>
+              <p>멤버가 시각을 정하거나 귀가 완료를 누르면 다른 멤버 화면에도 바로 반영돼요. 앱을 닫아 둬도 오는 알림은 준비하고 있어요.</p>
+            </article>
+            <article class="lp-card">
+              <span class="lp-soon">준비 중</span>
+              <div class="ico-box"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17l5-5.5 3.5 3L20 7"/><path d="M15 7h5v5"/></svg></div>
+              <h4>AI 지연 예측 · 막차 확률</h4>
+              <p class="tech-name">분위수 회귀</p>
+              <p>지난 운행 기록으로 “늦어도 대부분 이 정도 안에 온다”는 지연 폭을 배워, 경로마다 막차를 탈 가능성을 알려 줄 예정이에요.</p>
+              <p class="eg">이 경로로 막차 탈 확률 94%</p>
+            </article>
+          </div>
+          <ul class="lp-sources">
+            <li>KRIC 철도데이터 · 역 순서와 열차 시간표</li>
+            <li>국토교통부 TAGO · 지하철역과 노선</li>
+            <li>카카오맵 · 지도와 장소 검색</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 마지막 권유 -->
+      <section class="lp-final">
+        <div class="lp-wrap">
+          <h2>오늘 모임, 막차 걱정은 맡겨 두세요</h2>
+          <p>가입은 1분이면 충분해요.</p>
+          <div class="lp-cta">
+            <a href="./html/signup.html" class="btn btn-primary">무료로 시작하기</a>
+            <a href="./html/login.html" class="btn">이미 계정이 있어요</a>
+          </div>
+        </div>
+      </section>
     </main>
 
+    <footer class="lp-foot">
+      <div class="lp-wrap">
+        <span>막차 자기장</span>
+        <span>시간표는 한국철도공사와 국토교통부의 공공데이터를 써요. 실제 운행과 다를 수 있어요.</span>
+      </div>
+    </footer>
   </body>
 </html>

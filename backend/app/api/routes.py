@@ -54,6 +54,24 @@ def _now_service_minutes() -> int:
     return t + 1440 if now.hour < SERVICE_DAY_START else t
 
 
+def parse_targets(raw) -> dict[str, int]:
+    """요청의 도착 후보 [{id, walk}] → {역 id: 집까지 걷는 분}. 모양이 틀린 것은 버린다"""
+    out = {}
+    for t in (raw if isinstance(raw, list) else [])[:MAX_TARGETS]:
+        tid, walk = str((t or {}).get("id") or ""), (t or {}).get("walk", 0)
+        if ID_PATTERN.fullmatch(tid) and isinstance(walk, (int, float)) and 0 <= walk <= MAX_HOME_WALK_MIN:
+            out[tid] = round(walk)
+    return out
+
+
+def unavailable_note(region: str, daily: str) -> str:
+    """연결망 자료가 없을 때 화면에 보여 줄 안내"""
+    if kric_net.is_building():
+        return "지하철 시간표 자료를 받는 중이에요. 몇 분 뒤 다시 열어 주세요."
+    current_app.logger.warning("[routes] %s/%s 시간표 자료가 없어요. 서버를 다시 켜면 받기 시작해요", region, daily)
+    return "이 지역의 오늘 시간표 자료가 아직 준비되지 않았어요."
+
+
 def _base_line_name(name: str) -> str:
     """'수도권 1호선' -> '1호선' (지연 예측표가 노선 이름만 쓴다)"""
     return name.split(" ", 1)[1] if " " in name and name.split(" ", 1)[0] in kric.REGION_CODES else name
@@ -89,15 +107,8 @@ def _to_response(net: router.Network, legs: list[dict]) -> dict:
 def find():
     body = request.get_json(silent=True) or {}
     origin = str(body.get("from") or "")
-    raw_targets = body.get("to") or []
-    if not ID_PATTERN.fullmatch(origin) or not isinstance(raw_targets, list) or not raw_targets:
-        return jsonify(error="출발역과 도착역을 확인해 주세요."), 400
-    targets_tago = {}
-    for t in raw_targets[:MAX_TARGETS]:
-        tid, walk = str((t or {}).get("id") or ""), (t or {}).get("walk", 0)
-        if ID_PATTERN.fullmatch(tid) and isinstance(walk, (int, float)) and 0 <= walk <= MAX_HOME_WALK_MIN:
-            targets_tago[tid] = round(walk)
-    if not targets_tago:
+    targets_tago = parse_targets(body.get("to"))
+    if not ID_PATTERN.fullmatch(origin) or not targets_tago:
         return jsonify(error="출발역과 도착역을 확인해 주세요."), 400
 
     region = kric.REGION_CODES[subway_core.region_of(origin)]
@@ -105,10 +116,7 @@ def find():
     day_label = subway_core.DAILY_LABELS[daily]
     net = _network(region, kric.DAY_CODES[daily])
     if net is None:
-        if kric_net.is_building():
-            return jsonify(routes=[], day=day_label, note="지하철 시간표 자료를 받는 중이에요. 몇 분 뒤 다시 열어 주세요.")
-        current_app.logger.warning("[routes] %s/%s 시간표 자료가 없어요. 서버를 다시 켜면 받기 시작해요", region, daily)
-        return jsonify(routes=[], day=day_label, note="이 지역의 오늘 시간표 자료가 아직 준비되지 않았어요.")
+        return jsonify(routes=[], day=day_label, note=unavailable_note(region, daily))
 
     origin_node = net.by_tago.get(origin)
     targets = {net.by_tago[t]: w for t, w in targets_tago.items() if t in net.by_tago}

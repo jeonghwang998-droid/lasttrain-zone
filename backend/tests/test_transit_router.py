@@ -121,3 +121,13 @@ def test_does_not_alight_before_boarding():
     tt = _tt(("9", [("Y|C|t", _m(23, 0), _m(23, 0)), ("Y|C|a", _m(23, 5), _m(23, 5)), ("Y|C|s", _m(23, 10), _m(23, 10))]))
     net = tr.build_network(lines, tt, WALK)
     assert tr.find_routes(net, "Y|C|a", {"Y|C|t": 0}, not_before=_m(22, 0)) == []
+
+
+def test_zone_deadline_per_station():
+    # 자기장: T(집 근처 역)에 가려면 A 에서 늦어도 23:30(L1), S 에서 늦어도 23:55(L2 막차) 에 타야 한다
+    d = tr.latest_departures(_net(), {"X|L2|t2": 0}, not_before=_m(22, 0))
+    assert d["X|L1|a1"] == _m(23, 30)
+    assert d["X|L2|s2"] == _m(23, 55)
+    # S 의 L1 승강장에서는 L2 승강장까지 걸어가야 하니 걷는 시간만큼 이르다
+    assert d["X|L1|s1"] == _m(23, 55) - WALK
+    assert "X|L2|t2" not in d  # 목적지 역은 빠진다

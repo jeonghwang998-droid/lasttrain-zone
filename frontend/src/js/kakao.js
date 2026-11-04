@@ -109,12 +109,55 @@ export async function nearbyStations(lat, lng, radius = 1500, size = 8) {
   })
 }
 
+/* ---------- 내 주변 역 넓게 찾기 (자기장용) ---------- */
+
+// 반경 안의 지하철역을 거리순으로 최대 maxPages × 15 곳. 카카오 검색은 한 번에 15곳씩 나눠 준다
+export async function stationsAround(lat, lng, radius, maxPages = 3) {
+  const kakao = await loadKakao()
+  if (!kakao) return []
+  const sv = kakao.maps.services
+  const ps = new sv.Places()
+  const out = []
+  await new Promise((resolve) => {
+    ps.categorySearch(
+      'SW8',
+      (data, status, pagination) => {
+        if (status !== sv.Status.OK) return resolve()
+        for (const d of data) {
+          const p = toPlace(d)
+          const m = p.name.match(/^(.+?)\s+(\S.*)$/)
+          out.push({
+            stationName: m ? m[1] : p.name,
+            lineLabel: p.category.split('>').pop().trim() || (m ? m[2] : ''),
+            lat: p.lat,
+            lng: p.lng,
+            distance: p.distance,
+          })
+        }
+        if (pagination && pagination.hasNextPage && pagination.current < maxPages) pagination.nextPage()
+        else resolve()
+      },
+      { location: new kakao.maps.LatLng(lat, lng), radius, sort: sv.SortBy.DISTANCE },
+    )
+  })
+  return out
+}
+
 /* ---------- 지도 ---------- */
 
 const escHtml = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
-// 지도를 그린다. points: [{ lat, lng, kind: 'me' | 'from' | 'home', label }]
-// 점들이 모두 보이게 맞추고, 출발과 집 사이에 점선을 긋는다. 지도를 못 만들면 null
+// 자기장 색: 여유가 많을수록 파랑, 줄어들면 주황, 거의 없으면 빨강 (css/global.css 의 --calm/--warn/--danger 와 같다)
+const ZONE_COLORS = { calm: '#0052a4', warn: '#b86e00', danger: '#d92d3a' }
+const ZONE_FILL_OPACITY = 0.05
+// 처음 확대: 내 위치와 출발역이 아주 가까워도 이 단계보다 더 들어가지 않는다 (카카오 지도 단계, 작을수록 확대)
+const MIN_START_LEVEL = 3
+
+const pinHtml = (p) => `<div class="map-pin ${escHtml(p.kind)}"><span>${escHtml(p.label || '')}</span></div>`
+
+// 지도를 그린다. points: [{ lat, lng, kind: 'me' | 'from' | 'home' | 'to', label }]
+// 처음엔 내 위치에서 출발역까지만 보이게 확대한다 (빠르게 확인하도록). 내 위치가 없으면 모든 점이 보이게 맞춘다.
+// 반환: { map, relayout, setMe(lat, lng), setZone(circles) }. 지도를 못 만들면 null
 export async function drawMap(el, points) {
   const kakao = await loadKakao()
   const valid = points.filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng))
@@ -122,21 +165,14 @@ export async function drawMap(el, points) {
   const k = kakao.maps
   el.innerHTML = ''
   const map = new k.Map(el, { center: new k.LatLng(valid[0].lat, valid[0].lng), level: 5 })
-  const bounds = new k.LatLngBounds()
 
+  const pins = {}
   valid.forEach((p) => {
-    const pos = new k.LatLng(p.lat, p.lng)
-    bounds.extend(pos)
-    new k.CustomOverlay({
-      map,
-      position: pos,
-      yAnchor: 1.2,
-      content: `<div class="map-pin ${escHtml(p.kind)}"><span>${escHtml(p.label || '')}</span></div>`,
-    })
+    pins[p.kind] = new k.CustomOverlay({ map, position: new k.LatLng(p.lat, p.lng), yAnchor: 1.2, zIndex: 3, content: pinHtml(p) })
   })
 
   const from = valid.find((p) => p.kind === 'from')
-  const home = valid.find((p) => p.kind === 'home')
+  const home = valid.find((p) => p.kind === 'home' || p.kind === 'to')
   if (from && home) {
     new k.Polyline({
       map,
@@ -148,6 +184,49 @@ export async function drawMap(el, points) {
     })
   }
 
-  if (valid.length > 1) map.setBounds(bounds, 60, 40, 40, 40)
-  return { map, relayout: () => map.relayout() }
+  const near = valid.filter((p) => p.kind === 'me' || p.kind === 'from')
+  const fit = near.length && valid.some((p) => p.kind === 'me') ? near : valid
+  if (fit.length > 1) {
+    const bounds = new k.LatLngBounds()
+    fit.forEach((p) => bounds.extend(new k.LatLng(p.lat, p.lng)))
+    map.setBounds(bounds, 70, 50, 50, 50)
+    if (map.getLevel() < MIN_START_LEVEL) map.setLevel(MIN_START_LEVEL)
+  } else {
+    map.setCenter(new k.LatLng(fit[0].lat, fit[0].lng))
+    map.setLevel(MIN_START_LEVEL)
+  }
+
+  // 내 위치 핀을 옮긴다 (위치가 바뀔 때마다)
+  function setMe(lat, lng) {
+    const pos = new k.LatLng(lat, lng)
+    if (pins.me) pins.me.setPosition(pos)
+    else pins.me = new k.CustomOverlay({ map, position: pos, yAnchor: 1.2, zIndex: 3, content: pinHtml({ kind: 'me', label: '내 위치' }) })
+  }
+
+  // 자기장: circles = [{ key, lat, lng, radius(m), level }]. 같은 key 는 반경과 색만 바꿔서 부드럽게 줄어든다
+  const circles = new Map()
+  function setZone(list) {
+    const keep = new Set()
+    for (const c of list) {
+      keep.add(c.key)
+      const color = ZONE_COLORS[c.level] || ZONE_COLORS.calm
+      // 원이 여러 개 겹치면 색이 진해지므로 아주 연하게 칠한다 (지도가 잘 보이도록)
+      const style = { strokeWeight: 1, strokeColor: color, strokeOpacity: 0.25, fillColor: color, fillOpacity: ZONE_FILL_OPACITY }
+      const old = circles.get(c.key)
+      if (old) {
+        old.setRadius(c.radius)
+        old.setOptions(style)
+      } else {
+        circles.set(c.key, new k.Circle({ map, center: new k.LatLng(c.lat, c.lng), radius: c.radius, zIndex: 1, ...style }))
+      }
+    }
+    for (const [key, circle] of circles) {
+      if (!keep.has(key)) {
+        circle.setMap(null)
+        circles.delete(key)
+      }
+    }
+  }
+
+  return { map, relayout: () => map.relayout(), setMe, setZone }
 }

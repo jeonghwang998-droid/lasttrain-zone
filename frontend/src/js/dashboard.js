@@ -3,13 +3,14 @@
 
 import { WD, RAIN_BINS } from './data.js'
 import { S } from './state.js'
-import { hhmm, left, nowSec } from './clock.js'
+import { hhmm, fm, left, nowSec, secToDate } from './clock.js'
 import { plansFor } from './planner.js'
-import { fetchRoutes, routesNote, TRANSIT_CONNECTED } from './transit.js'
+import { fetchRoutes, routesNote, destinationStations, applyWalk, TRANSIT_CONNECTED } from './transit.js'
+import { loadDeadlines, zoneStations, zoneCircles, bestEscape } from './zone.js'
 import { routeCardsHtml, routesEmptyHtml, lastBoxHtml, restText } from './routeview.js'
 import * as Kakao from './kakao.js'
 import * as Home from './home.js'
-import { permissionState, onPermissionChange, getPosition } from './geo.js'
+import { permissionState, onPermissionChange, getPosition, watchPosition, distanceM, WALK_DETOUR } from './geo.js'
 import { initApp, url } from './app.js'
 import { getPrefs, logout } from './account.js'
 import { sessionUserId, loadConfig, loadProfile, saveBuffer, loadTrips, addTrip, deleteTrip } from './db.js'
@@ -179,7 +180,11 @@ function renderLocCard() {
 function onPositionChanged() {
   renderLocCard()
   if (!$('trip-ask').hidden) renderNearby()
-  if (screen === 'detail' && S.trip) drawRouteMap()
+  if (screen === 'detail' && S.trip) {
+    drawRouteMap()
+    startLiveLocation()
+    if (myPos && !zone.loading && (!zone.center || zone.note)) loadZone()
+  }
 }
 
 async function enableLocation() {
@@ -824,6 +829,122 @@ async function drawRouteMap() {
   } else if (!myPos) {
     $('mapMsg').textContent = '위치를 켜면 지도에 내 위치도 보여 드려요.'
   }
+  renderLive()
+}
+
+/* ----- 실시간: 지금 위치에서 출발역까지 걷기, 막차 자기장 ----- */
+const LIVE_REFRESH_MS = 5000 // 자기장 반경과 걷기 카드를 다시 그리는 간격 (시간이 지나면 자기장이 줄어든다)
+const WALK_REPLAN_M = 15 // 이만큼 움직이면 일어날 시각을 다시 계산한다
+const ZONE_RECENTER_M = 1500 // 자기장을 계산한 자리에서 이만큼 멀어지면 주변 역을 다시 찾는다
+let stopWatch = null
+let lastPlannedPos = null
+let zone = { routeId: null, center: null, stations: [], note: '', loading: false }
+
+const walkSpeed = () => S.walkSpeed || S.walkDefault || 1
+const koreanOr = (msg, fallback) => (msg && /[가-힣]/.test(msg) ? msg : fallback)
+
+// 상세 화면에 있는 동안 위치를 계속 따라간다
+function startLiveLocation() {
+  if (stopWatch || geoState !== 'granted' || screen !== 'detail') return
+  stopWatch = watchPosition(
+    (pos) => {
+      myPos = pos
+      if (mapHandle) mapHandle.setMe(pos.lat, pos.lng)
+      if (S.trip && (!lastPlannedPos || distanceM(lastPlannedPos, pos) >= WALK_REPLAN_M)) {
+        lastPlannedPos = pos
+        applyWalk(S.routes, myPos, S.trip.from)
+        rerender()
+      }
+      if (zone.center && distanceM(zone.center, pos) >= ZONE_RECENTER_M) loadZone()
+      renderLive()
+    },
+    (msg) => {
+      geoError = msg
+    },
+  )
+}
+
+function stopLiveLocation() {
+  if (stopWatch) stopWatch()
+  stopWatch = null
+  lastPlannedPos = null
+}
+
+// 자기장 자료: 집 근처 역까지의 막차 마감(서버) + 내 주변 역(카카오)
+async function loadZone() {
+  const t = S.trip
+  const id = routeId
+  const center = myPos || (t && t.from.lat != null ? t.from : null)
+  zone = { routeId: id, center, stations: [], note: '', loading: true }
+  renderLive()
+  try {
+    if (!center) {
+      zone.note = '위치를 켜면 지금 있는 곳의 막차 자기장을 보여 드려요.'
+      return
+    }
+    const targets = await destinationStations(t.to)
+    if (!targets.length) {
+      zone.note = '집 근처에서 시간표를 확인할 수 있는 역을 찾지 못했어요.'
+      return
+    }
+    const res = await loadDeadlines(targets)
+    const stations = res.note ? [] : await zoneStations(center, res.stations)
+    if (routeId !== id) return // 그사이 다른 경로를 열었다
+    zone.stations = stations
+    zone.note = res.note || ''
+  } catch (e) {
+    console.error(e)
+    zone.note = koreanOr(e && e.message, '막차 자기장을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.')
+  } finally {
+    if (routeId === id) {
+      zone.loading = false
+      renderLive()
+    }
+  }
+}
+
+function renderLive() {
+  if (screen !== 'detail' || !S.trip) return
+  const now = nowSec() / 60
+  const circles = zoneCircles(zone.stations, now, walkSpeed(), S.buffer)
+  if (mapHandle) mapHandle.setZone(circles)
+
+  const st = $('zoneStatus')
+  if (zone.loading) st.textContent = '막차 자기장을 계산하는 중이에요…'
+  else if (zone.note) st.textContent = zone.note
+  else if (!zone.stations.length) st.textContent = '내 주변에서 집으로 갈 수 있는 역을 찾지 못했어요.'
+  else if (!circles.length) st.innerHTML = '<b class="out">귀가 가능 구역이 모두 사라졌어요.</b> 택시나 심야버스를 알아보세요.'
+  else if (!myPos) st.textContent = `주변에서 아직 탈 수 있는 역 ${circles.length}곳이 자기장 안에 있어요. 위치를 켜면 내가 안에 있는지 알려 드려요.`
+  else {
+    const best = bestEscape(myPos, circles, walkSpeed())
+    st.innerHTML = best
+      ? `<b class="in">지금 위치는 귀가 가능 구역 안이에요.</b> ${esc(best.circle.name)}까지 걸어서 ${best.walkMin}분${S.buffer ? `, 일찍 일어나기 ${S.buffer}분을 빼고도` : ','} ${best.slack}분 여유`
+      : '<b class="out">지금 위치는 귀가 가능 구역 밖이에요.</b> 걸어서 막차 전에 닿는 역이 없어요.'
+  }
+  renderWalkCard(now)
+}
+
+// 지금 위치 → 출발역: 거리, 걷는 시간, 탈 열차까지 여유
+function renderWalkCard(nowMin) {
+  const from = S.trip && S.trip.from
+  const show = Boolean(myPos && from && from.lat != null)
+  $('walkCard').hidden = !show
+  if (!show) return
+  const meters = distanceM(myPos, from) * WALK_DETOUR
+  const walkMin = Math.max(1, Math.ceil(meters / walkSpeed()))
+  $('walkTitle').textContent = `지금 위치 → ${from.name}`
+  $('walkSub').textContent = `약 ${meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`} · 지금 출발하면 ${hhmm((nowMin + walkMin) * 60)} 도착`
+  $('walkMin').textContent = walkMin
+  const first = plans[0] && plans[0].legs[0]
+  if (!first) {
+    $('walkTrain').textContent = ''
+    return
+  }
+  const spare = Math.floor(first.dep - (nowMin + walkMin))
+  $('walkTrain').innerHTML =
+    spare >= 0
+      ? `탈 열차 <b>${fm(first.dep)}</b> ${esc(first.leg.name)}까지 역에서 <b>${spare}분</b> 여유`
+      : `지금 걸어가도 <b>${fm(first.dep)}</b> ${esc(first.leg.name)} 열차는 놓쳐요. 다른 경로를 확인해 보세요.`
 }
 
 // 고른 출발역의 막차 (역으로 등록한 경로만)
@@ -862,13 +983,17 @@ async function openRoute(id) {
   renderMeScreen()
   syncDetailHead()
   drawRouteMap()
+  loadZone()
+  startLiveLocation()
   renderLast()
   await loadRoutes()
+  lastPlannedPos = myPos
   rerender()
 }
 
 $('detailBack').addEventListener('click', () => {
   screen = 'list'
+  stopLiveLocation()
   mapHandle = null
   renderMeScreen()
 })
@@ -889,22 +1014,36 @@ function alertUser(msg) {
 }
 
 /* ---------- 우리 테이블 ---------- */
-// 화면은 두 가지: 모임 목록(코드 생성/공유, 새 모임, 코드 입장)과 모임 안(막차 입력, 멤버들의 막차)
-const MODE_ICON = { subway: '🚇', bus: '🚌' }
-const MODE_TEXT = { subway: '지하철', bus: '버스' }
-// 새벽 4시 전 시각은 전날 밤 다음에 오는 시각으로 보고 정렬한다
-const NIGHT_WRAPS_BEFORE_HOUR = 4
+// 모임 목록(새 모임, 초대 코드 입장)과 모임 안.
+// 모임 안: 멤버마다 자기 도착지(집 또는 고른 역)로 막차를 계산해 출발 시각(leave_at)을 모임에 공유하고,
+// 가장 빠른 마지노선을 '다 같이 일어날 시각'으로 보여 준다. 알람을 켠 멤버는 그 시각에 맞춰 같이 알림을 받는다.
+// 집에 도착하면 '귀가 완료'를 눌러 모두에게 알린다 (안심 귀가 체크)
+const ROOM_REPLAN_MS = 60000 // 모임 안에서 내 막차를 다시 계산하는 간격 (시간이 지나고 위치가 바뀌므로)
+const ROOM_ALARM_POLL_MS = 30000 // 알람을 켠 모임들의 '다 같이 일어날 시각'을 확인하는 간격 (모임 화면 밖에서도)
+const ROOM_MSG = {
+  30: '다 같이 일어날 시각까지 30분 남았어요.',
+  10: '다 같이 일어날 시각까지 10분 남았어요. 계산부터 하세요.',
+  0: '지금 다 같이 일어나야 막차 타요!',
+}
 
 let inRoom = false
-let lastTrains = []
-let ltMode = 'subway'
 let generated = null // 방금 코드를 만든 모임 { code, place_label }
+let mySettings = null // 이 모임에서 내 도착지와 알람 { use_home, dest_station_id, dest_label, dest_lat, dest_lng, alarm_on }
+let roomMapHandle = null
+let roomPlanSeq = 0
+let sharedLeave = null // 마지막으로 모임에 알린 내 출발 시각(ms)
+const alarmDeadlines = new Map() // 모임 id -> { at: Date, name } (알람을 켠 모임들)
+const roomFired = {} // 이미 울린 모임 알람
 
 const currentRoom = () => rooms.find((r) => r.id === roomId)
+const clockOf = (date) => date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
 
-function minutesForSort(hhmmText) {
-  const [h, m] = hhmmText.split(':').map(Number)
-  return (h < NIGHT_WRAPS_BEFORE_HOUR ? h + 24 : h) * 60 + m
+// 아직 귀가하지 않은 멤버 중 가장 이른 출발 시각
+function groupDeadline(list) {
+  const active = list.filter((m) => m.status !== 'arrived' && m.leaveAt)
+  if (!active.length) return null
+  const at = new Date(Math.min(...active.map((m) => +m.leaveAt)))
+  return { at, who: active.filter((m) => +m.leaveAt === +at) }
 }
 
 async function loadRooms() {
@@ -914,7 +1053,7 @@ async function loadRooms() {
     $('groupErr').textContent = Rooms.roomError(e)
     rooms = []
   }
-  if (inRoom && !currentRoom()) closeRoom() // 나갔거나 만료된 모임
+  if (inRoom && !currentRoom()) closeRoom() // 나간 모임
   renderChannels()
 }
 
@@ -937,10 +1076,30 @@ async function enterRoom(id) {
   if (unwatch) unwatch()
   roomId = id
   inRoom = true
+  sharedLeave = null
+  roomMapHandle = null
   showRoomView()
   unwatch = Rooms.watchRoom(id, () => refreshRoom())
   $('roomErr').textContent = ''
-  await refreshRoom(true)
+  $('myRoomRoute').innerHTML = ''
+  $('roomMap').hidden = true
+  try {
+    mySettings = await Rooms.mySettings(id, uid)
+  } catch (e) {
+    mySettings = null
+    $('roomErr').textContent = Rooms.roomError(e)
+  }
+  if (!mySettings) mySettings = { use_home: true, alarm_on: false } // 처음엔 내 집으로
+  renderDestMode()
+  await refreshRoom()
+  if (geoState === 'granted') {
+    try {
+      myPos = await getPosition()
+    } catch (e) {
+      geoError = e.message
+    }
+  }
+  planMyRoomRoute()
 }
 
 function closeRoom() {
@@ -949,74 +1108,308 @@ function closeRoom() {
   roomId = null
   inRoom = false
   members = []
-  lastTrains = []
+  roomMapHandle = null
+  roomPlanSeq++
   showRoomView()
 }
 
-// fillForm: 모임에 막 들어왔을 때만 내가 저장해 둔 값을 입력칸에 채운다 (입력 중인 글을 덮지 않으려고)
-async function refreshRoom(fillForm = false) {
+async function refreshRoom() {
   if (!inRoom) return
   const id = roomId
-  let m = []
-  let t = []
-  let err = ''
+  let list = []
   try {
-    m = await Rooms.roomMembers(id)
+    list = await Rooms.roomMembers(id)
   } catch (e) {
-    err = Rooms.roomError(e)
-  }
-  try {
-    t = await Rooms.roomLastTrains(id)
-  } catch (e) {
-    err = err || Rooms.roomError(e)
+    $('roomErr').textContent = Rooms.roomError(e)
   }
   if (!inRoom || roomId !== id) return // 기다리는 사이 다른 화면으로 옮겼다
-  members = m
-  lastTrains = t
-  if (err) $('roomErr').textContent = err
-  renderRoom(fillForm)
+  members = list
+  const room = currentRoom()
+  const g = groupDeadline(members)
+  if (room && mySettings && mySettings.alarm_on) {
+    if (g) alarmDeadlines.set(id, { at: g.at, name: room.place_label || '모임' })
+    else alarmDeadlines.delete(id)
+  }
+  renderRoom()
 }
 
-function setMode(mode) {
-  ltMode = mode
-  Object.keys(MODE_TEXT).forEach((k) => $('mode-' + k).setAttribute('aria-pressed', k === mode))
-}
-
-function renderRoom(fillForm) {
+function renderRoom() {
   const room = currentRoom()
   if (!room) return
   $('roomName').textContent = room.place_label || '이름 없는 모임'
+  $('roomCodeChip').textContent = `초대 코드 ${room.code}`
+  $('roomAlarm').setAttribute('aria-pressed', Boolean(mySettings && mySettings.alarm_on))
 
-  const mine = lastTrains.find((t) => t.userId === uid)
-  if (fillForm) {
-    setMode(mine ? mine.mode : 'subway')
-    $('ltLabel').value = mine ? mine.label : ''
-    $('ltTime').value = mine ? mine.time : ''
-  }
-  $('ltClear').hidden = !mine
-
-  const byUser = new Map(lastTrains.map((t) => [t.userId, t]))
+  const g = groupDeadline(members)
+  const firstIds = new Set(g ? g.who.map((m) => m.userId) : [])
+  // 아직 귀가 안 한 사람은 출발 시각이 이른 순, 귀가 완료한 사람은 아래로
   const sorted = [...members].sort((a, b) => {
-    const ta = byUser.get(a.userId)
-    const tb = byUser.get(b.userId)
-    if (ta && tb) return minutesForSort(ta.time) - minutesForSort(tb.time)
-    if (ta) return -1
-    if (tb) return 1
+    const ra = a.status === 'arrived' ? 2 : a.leaveAt ? 0 : 1
+    const rb = b.status === 'arrived' ? 2 : b.leaveAt ? 0 : 1
+    if (ra !== rb) return ra - rb
+    if (ra === 0) return a.leaveAt - b.leaveAt
     return a.joinedAt - b.joinedAt
   })
   $('people').innerHTML = sorted
     .map((m) => {
-      const t = byUser.get(m.userId)
+      const arrived = m.status === 'arrived'
       const tags = `${m.userId === uid ? ' (나)' : ''}${m.userId === room.host_id ? ' · 방장' : ''}`
-      const detail = t ? `${MODE_TEXT[t.mode] || ''}${t.label ? ' · ' + esc(t.label) : ''}` : '아직 입력하지 않았어요'
+      const detail = arrived
+        ? `귀가 완료${m.arrivedAt ? ` ${clockOf(m.arrivedAt)}` : ''}`
+        : m.leaveAt
+          ? `${clockOf(m.leaveAt)}까지 일어나야 해요`
+          : '막차 계산 전'
+      const icon = arrived
+        ? '<svg class="ico ok" viewBox="0 0 24 24" aria-label="귀가 완료"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>'
+        : `<i class="m-dot${firstIds.has(m.userId) ? ' first' : ''}" aria-hidden="true"></i>`
       return (
-        `<li><span class="mode">${t ? MODE_ICON[t.mode] || '' : '·'}</span>` +
+        `<li class="${arrived ? 'arrived' : firstIds.has(m.userId) ? 'first' : ''}"><span class="mode">${icon}</span>` +
         `<div><div class="who">${esc(m.nickname)}${tags}</div><div class="home">${detail}</div></div>` +
-        `<span class="when">${t ? esc(t.time) : ''}</span><span></span></li>`
+        `<span class="when"${!arrived && m.leaveAt ? ` data-leave="${+m.leaveAt}"` : ''}>${arrived ? '✓' : ''}</span><span></span></li>`
       )
     })
     .join('')
+
+  const me = members.find((m) => m.userId === uid)
+  const arrived = Boolean(me && me.status === 'arrived')
+  $('btnArrived').textContent = arrived ? '귀가 완료 취소' : '집에 도착했어요'
+  $('btnArrived').classList.toggle('btn-primary', !arrived)
+  roomTick()
 }
+
+// 매 0.25초: 다 같이 일어날 시각까지 남은 시간
+function roomTick() {
+  if (!inRoom) return
+  const g = groupDeadline(members)
+  if (!g) {
+    $('gTime').textContent = '--:--'
+    const allHome = members.length > 0 && members.every((m) => m.status === 'arrived')
+    $('gCount').textContent = allHome ? '모두 귀가했어요' : '멤버들의 막차를 계산하는 중이에요'
+    $('gWho').textContent = allHome ? '' : '각자 이 모임을 열면 출발 시각이 공유돼요'
+  } else {
+    const r = (g.at - Date.now()) / 1000
+    $('gTime').textContent = clockOf(g.at)
+    $('gCount').textContent = r < 0 ? '마지노선이 지났어요. 택시나 심야버스를 알아보세요' : `앞으로 ${left(r)}`
+    $('gWho').textContent = `${g.who.map((m) => (m.userId === uid ? '나' : m.nickname)).join(', ')}의 막차 기준`
+  }
+  document.querySelectorAll('#people [data-leave]').forEach((el) => {
+    el.textContent = left((Number(el.dataset.leave) - Date.now()) / 1000)
+  })
+}
+
+// 알람을 켠 모임들: 다 같이 일어날 시각 30, 10, 0분 전에 알린다 (앱이 열려 있으면 어느 화면에서든)
+function checkRoomAlarms() {
+  for (const [id, { at, name }] of alarmDeadlines) {
+    const r = (at - Date.now()) / 1000
+    for (const t of [30, 10, 0]) {
+      const key = `${id}|${+at}|${t}`
+      if (r <= t * 60 && r > -120 && !roomFired[key]) {
+        roomFired[key] = 1
+        if (getPrefs().notify['t' + t]) alertUser(`[${name}] ${ROOM_MSG[t]}`)
+      }
+    }
+  }
+}
+
+async function pollRoomAlarms() {
+  let ids = []
+  try {
+    ids = await Rooms.alarmRooms(uid)
+  } catch (e) {
+    return // 아직 SQL 008 전이면 조용히 넘어간다
+  }
+  for (const id of [...alarmDeadlines.keys()]) if (!ids.includes(id)) alarmDeadlines.delete(id)
+  for (const id of ids) {
+    const room = rooms.find((r) => r.id === id)
+    if (!room) continue
+    const list = inRoom && roomId === id ? members : await Rooms.roomMembers(id).catch(() => null)
+    if (!list) continue
+    const g = groupDeadline(list)
+    if (g) alarmDeadlines.set(id, { at: g.at, name: room.place_label || '모임' })
+    else alarmDeadlines.delete(id)
+  }
+}
+
+/* ----- 모임 안: 내 도착지와 내 막차 ----- */
+// 내 도착지: 집이면 my_home, 아니면 고른 역
+function myRoomDest() {
+  if (!mySettings) return null
+  if (mySettings.use_home) {
+    return home && home.station
+      ? { name: home.station.label, stationId: home.station.id, line: home.station.line, lat: home.lat, lng: home.lng, isHome: true }
+      : null
+  }
+  return mySettings.dest_station_id
+    ? { name: mySettings.dest_label, stationId: mySettings.dest_station_id, lat: mySettings.dest_lat, lng: mySettings.dest_lng }
+    : null
+}
+
+function renderDestMode() {
+  const isHome = Boolean(mySettings && mySettings.use_home)
+  $('roomDestHome').setAttribute('aria-pressed', isHome)
+  $('roomDestOther').setAttribute('aria-pressed', !isHome)
+  $('roomDestWrap').hidden = isHome
+  $('roomDestInput').value = !isHome && mySettings.dest_label ? mySettings.dest_label : ''
+}
+
+async function saveRoomSettings(changes) {
+  mySettings = { ...mySettings, ...changes }
+  try {
+    await Rooms.saveMySettings(roomId, uid, mySettings)
+  } catch (e) {
+    $('roomErr').textContent = Rooms.roomError(e)
+  }
+}
+
+// 지금 위치에서 가장 가까운 역 → 내 도착지. 계산한 출발 시각은 모임에 공유한다
+async function planMyRoomRoute() {
+  const mine = ++roomPlanSeq
+  const room = currentRoom()
+  if (!room) return
+  const msg = $('myPlanMsg')
+  $('roomLocBtn').hidden = true
+  const to = myRoomDest()
+  if (!to) {
+    msg.textContent = mySettings && mySettings.use_home ? '집이 아직 설정되지 않았어요. 나 탭에서 집을 먼저 정해 주세요.' : '내릴 지하철역을 검색해서 골라 주세요.'
+    $('myRoomRoute').innerHTML = ''
+    $('roomMap').hidden = true
+    return
+  }
+  if (!myPos) {
+    msg.textContent = '위치를 켜면 지금 있는 곳에서 내 막차를 계산해요.'
+    $('roomLocBtn').hidden = geoState === 'unsupported'
+    return
+  }
+  msg.textContent = '내 막차를 계산하는 중이에요…'
+  await prepareStationPicker()
+  const near = subwayLines ? await Kakao.nearbyStations(myPos.lat, myPos.lng, NEARBY_RADIUS_M, NEARBY_LIMIT) : []
+  const st = near.map((n) => ({ n, m: Subway.matchStation(subwayLines, n) })).find((x) => x.m)
+  if (mine !== roomPlanSeq) return
+  if (!st) {
+    msg.textContent = '근처 1.5km 안에 시간표를 확인할 수 있는 지하철역이 없어요.'
+    return
+  }
+  const trip = { from: { name: st.m.label, stationId: st.m.id, line: st.m.line, lat: st.n.lat, lng: st.n.lng }, to }
+  let routes = []
+  try {
+    routes = await fetchRoutes(trip, myPos)
+  } catch (e) {
+    console.error(e)
+    if (mine === roomPlanSeq) msg.textContent = '내 막차를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
+    return
+  }
+  if (mine !== roomPlanSeq) return
+  const best = plansFor(routes, S.ai)[0] || null
+  $('myRoomRoute').innerHTML = best ? routeCardsHtml([best], trip, S.ai, 100) : routesEmptyHtml(trip, TRANSIT_CONNECTED, routesNote())
+  if (best && $('rs100')) $('rs100').textContent = hhmm(best.leave)
+  msg.textContent = best ? `가까운 ${trip.from.name}에서 출발 · ${hhmm(best.leave)}에 일어나면 돼요` : ''
+
+  // 지도: 내 위치, 출발역, 도착지
+  const mapEl = $('roomMap')
+  const points = [{ lat: myPos.lat, lng: myPos.lng, kind: 'me', label: '내 위치' }, { lat: trip.from.lat, lng: trip.from.lng, kind: 'from', label: trip.from.name.replace(/\s*\(.*\)\s*$/, '') }]
+  if (to.lat != null) points.push({ lat: to.lat, lng: to.lng, kind: to.isHome ? 'home' : 'to', label: to.isHome ? HOME_NAME : to.name })
+  mapEl.hidden = false
+  if (!roomMapHandle) roomMapHandle = await Kakao.drawMap(mapEl, points)
+  else roomMapHandle.setMe(myPos.lat, myPos.lng)
+  if (!roomMapHandle) mapEl.hidden = true
+
+  // 모임에 내 출발 시각 알리기 (바뀌었을 때만)
+  const leaveAt = best ? secToDate(best.leave) : null
+  const next = leaveAt ? +leaveAt : null
+  if (next !== sharedLeave) {
+    try {
+      await Rooms.setMyLeaveAt(room.id, uid, leaveAt)
+      sharedLeave = next
+      refreshRoom()
+    } catch (e) {
+      $('roomErr').textContent = Rooms.roomError(e)
+    }
+  }
+}
+
+// 도착지 검색 (지하철역만)
+let roomDestFound = []
+let roomDestTimer
+$('roomDestInput').addEventListener('input', () => {
+  clearTimeout(roomDestTimer)
+  const q = $('roomDestInput').value.trim()
+  const list = $('roomDestSuggest')
+  if (!Kakao.KAKAO_CONNECTED || !q) {
+    list.hidden = true
+    return
+  }
+  roomDestTimer = setTimeout(async () => {
+    await prepareStationPicker()
+    roomDestFound = (await Kakao.searchPlaces(q, 6, true)).map(placeFromSuggestion).filter((p) => p.stationId)
+    list.innerHTML = roomDestFound.map((p, i) => `<li><button type="button" data-i="${i}"><span class="nm">${esc(p.name)}</span></button></li>`).join('')
+    list.hidden = !roomDestFound.length
+  }, 250)
+})
+$('roomDestSuggest').addEventListener('mousedown', (e) => e.preventDefault())
+$('roomDestSuggest').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button')
+  if (!btn) return
+  const p = roomDestFound[Number(btn.dataset.i)]
+  $('roomDestInput').value = p.name
+  $('roomDestSuggest').hidden = true
+  await saveRoomSettings({ use_home: false, dest_station_id: p.stationId, dest_label: p.name, dest_lat: p.lat ?? null, dest_lng: p.lng ?? null })
+  roomMapHandle = null
+  planMyRoomRoute()
+})
+$('roomDestInput').addEventListener('blur', () => setTimeout(() => ($('roomDestSuggest').hidden = true), 150))
+
+$('roomDestHome').addEventListener('click', async () => {
+  await saveRoomSettings({ use_home: true })
+  renderDestMode()
+  roomMapHandle = null
+  planMyRoomRoute()
+})
+$('roomDestOther').addEventListener('click', () => {
+  mySettings = { ...mySettings, use_home: false }
+  renderDestMode()
+  $('roomDestInput').focus()
+  if (mySettings.dest_station_id) {
+    saveRoomSettings({ use_home: false })
+    roomMapHandle = null
+    planMyRoomRoute()
+  }
+})
+
+$('roomLocBtn').addEventListener('click', async () => {
+  await enableLocation()
+  planMyRoomRoute()
+})
+
+// 다 같이 일어날 시각 알람
+$('roomAlarm').addEventListener('click', async () => {
+  const on = !(mySettings && mySettings.alarm_on)
+  if (on && 'Notification' in window && Notification.permission === 'default') {
+    await Notification.requestPermission().catch(() => {})
+  }
+  await saveRoomSettings({ alarm_on: on })
+  if (on) {
+    const g = groupDeadline(members)
+    if (g) alarmDeadlines.set(roomId, { at: g.at, name: (currentRoom() || {}).place_label || '모임' })
+  } else alarmDeadlines.delete(roomId)
+  renderRoom()
+  showToast(on ? '알람을 켰어요. 다 같이 일어날 시각 30분, 10분 전과 그 시각에 알려 드려요. (지금은 앱이 열려 있을 때만 울려요)' : '모임 알람을 껐어요.', 5000)
+})
+
+// 안심 귀가 체크
+$('btnArrived').addEventListener('click', () =>
+  runRoomAction(async () => {
+    const me = members.find((m) => m.userId === uid)
+    const arrived = !(me && me.status === 'arrived')
+    await Rooms.setArrived(roomId, uid, arrived)
+    await refreshRoom()
+    showToast(arrived ? '귀가 완료를 모임에 알렸어요. 오늘도 안전하게 도착했네요.' : '귀가 완료를 취소했어요.', 3500)
+  }, $('roomErr')),
+)
+
+$('roomCodeChip').addEventListener('click', () => {
+  const room = currentRoom()
+  if (room) shareRoom(room)
+})
 
 function renderGenerated() {
   $('genResult').hidden = !generated
@@ -1091,34 +1484,11 @@ $('join-form').addEventListener('submit', (e) => {
   }, $('groupErr'))
 })
 
-/* 모임 안 */
-$('mode-subway').addEventListener('click', () => setMode('subway'))
-$('mode-bus').addEventListener('click', () => setMode('bus'))
-$('lt-form').addEventListener('submit', (e) => {
-  e.preventDefault()
-  const time = $('ltTime').value
-  if (!time) {
-    $('roomErr').textContent = '막차 시각을 입력해 주세요.'
-    return
-  }
-  runRoomAction(async () => {
-    await Rooms.saveLastTrain(roomId, uid, { mode: ltMode, label: $('ltLabel').value.trim(), time })
-    await refreshRoom()
-    showToast('막차를 저장했어요.', 3000)
-  }, $('roomErr'))
-})
-$('ltClear').addEventListener('click', () =>
-  runRoomAction(async () => {
-    await Rooms.clearLastTrain(roomId, uid)
-    $('ltTime').value = ''
-    $('ltLabel').value = ''
-    await refreshRoom()
-  }, $('roomErr')),
-)
 $('btnLeave').addEventListener('click', () => {
   if (!confirm('이 모임에서 나갈까요?')) return
   runRoomAction(async () => {
     await Rooms.leaveRoom(roomId)
+    alarmDeadlines.delete(roomId)
     closeRoom()
     await loadRooms()
   }, $('roomErr'))
@@ -1233,6 +1603,8 @@ function tick() {
     $('heroCount').textContent = TRANSIT_CONNECTED ? '' : '교통 정보 연결 후 출발 시각이 계산돼요'
   }
 
+  roomTick()
+  checkRoomAlarms()
 }
 
 function updateLastRest(now) {
@@ -1243,6 +1615,7 @@ function updateLastRest(now) {
 
 function rerender() {
   renderMe()
+  renderLive()
 }
 
 function setView(v) {
@@ -1255,7 +1628,10 @@ function setView(v) {
   } catch (e) {
     /* 무시 */
   }
-  if (v === 'group' && inRoom) refreshRoom()
+  if (v === 'group' && inRoom) {
+    refreshRoom()
+    planMyRoomRoute()
+  }
 }
 
 /* ---------- 초기화와 이벤트 ---------- */
@@ -1350,7 +1726,15 @@ $('toastClose').addEventListener('click', () => $('toast').classList.remove('sho
 
 await init()
 setInterval(tick, 250)
+setInterval(renderLive, LIVE_REFRESH_MS)
 // 실시간 연결이 끊겨도 모임 안의 멤버와 막차가 늦지 않게 가끔 다시 불러온다
 setInterval(() => {
   if (!$('view-group').hidden && inRoom) refreshRoom()
 }, 20000)
+// 모임 안: 시간이 지나고 위치가 바뀌면 내 막차와 출발 시각을 다시 계산해 공유한다
+setInterval(() => {
+  if (!$('view-group').hidden && inRoom) planMyRoomRoute()
+}, ROOM_REPLAN_MS)
+// 알람을 켠 모임들의 다 같이 일어날 시각 (모임 화면 밖에서도)
+pollRoomAlarms()
+setInterval(pollRoomAlarms, ROOM_ALARM_POLL_MS)

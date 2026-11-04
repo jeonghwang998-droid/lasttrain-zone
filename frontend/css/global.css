@@ -926,3 +926,72 @@ input[type='range'] { width: 100%; accent-color: var(--calm); }
 .route.alt .why { margin: 0; padding: 0 16px 16px; }
 .route.alt[open] { background: var(--surface); }
 .route.alt[open] summary { border-bottom: 1px solid var(--line); }
+
+/* 막차 자기장 + 출발역까지 걷기 */
+.route-map { height: 300px; }
+.zone-bar { padding: 10px 16px 12px; border-top: 1px solid var(--line); }
+.zone-status { font-size: 14px; line-height: 1.5; }
+.zone-status:empty { display: none; }
+.zone-status b.in { color: var(--calm); }
+.zone-status b.out { color: var(--danger); }
+.zone-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.zone-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.zone-legend i { width: 10px; height: 10px; border-radius: 50%; opacity: 0.6; }
+.zone-legend i.calm { background: var(--calm); }
+.zone-legend i.warn { background: var(--warn); }
+.zone-legend i.danger { background: var(--danger); }
+
+.map-pin.me { animation: me-pulse 2s ease-in-out infinite; }
+@keyframes me-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 115, 232, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(26, 115, 232, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-pin.me { animation: none; }
+}
+
+.walk-card { padding: 16px; }
+.wk-row { display: flex; align-items: center; gap: 12px; }
+.wk-icon { flex: none; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; font-size: 20px; background: var(--surface-2); border-radius: 50%; }
+.wk-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wk-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-text span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wk-min { flex: none; text-align: right; }
+.wk-min b { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.wk-min small { margin-left: 2px; font-size: 14px; color: var(--muted); }
+.wk-train { margin: 10px 0 0; padding: 8px 12px; font-size: 14px; background: var(--bg); border-radius: 10px; }
+.wk-train:empty { display: none; }
+.walk-card .note { margin: 8px 0 0; }
+
+/* 모임 안: 다 같이 일어날 시각, 멤버, 내 막차 */
+.group-hero .g-who { margin: 6px 0 0; font-size: 14px; color: var(--muted); }
+.group-hero .g-who:empty { display: none; }
+.detail-head .code-chip { margin-top: 2px; }
+.to-mode.inline { flex-direction: row; align-self: auto; }
+.room-people li.first .who { color: var(--state); }
+.room-people li.first .when { color: var(--danger); font-weight: 700; }
+.room-people li.arrived { opacity: 0.75; }
+.room-people li.arrived .home { color: #1a6b3a; font-weight: 500; }
+.room-people .when { font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.room-map { height: 220px; margin: 10px 0; border-radius: 12px; overflow: hidden; }
+#btnArrived { margin-top: 4px; }
+#roomLocBtn { margin-top: 6px; }
+
+/* 선 아이콘 (이모지 대신). 하단 탭바 아이콘과 같은 굵기 */
+.ico { flex: none; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.btn .ico { width: 18px; height: 18px; margin-right: 6px; }
+.brand-mark { width: 24px; height: 24px; margin-right: 8px; vertical-align: -6px; border-radius: 6px; }
+.auth-logo { overflow: hidden; }
+.auth-logo .logo-img { width: 100%; height: 100%; object-fit: cover; }
+.auth-logo.icon { color: var(--calm); }
+.auth-logo.icon .ico { width: 32px; height: 32px; }
+.feature-ico { color: var(--calm); }
+.loc-icon { display: flex; color: var(--warn); }
+.loc-icon .ico { width: 28px; height: 28px; }
+.hc-icon { display: flex; color: var(--calm); }
+.wk-icon { color: var(--calm); }
+/* 모임 멤버: 점(가장 빠른 사람은 빨강), 귀가 완료는 초록 체크 */
+.people .mode { display: flex; align-items: center; justify-content: center; }
+.m-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.m-dot.first { width: 10px; height: 10px; background: var(--danger); box-shadow: 0 0 0 4px #fdebec; }
+.people .ico.ok { width: 20px; height: 20px; color: #1a6b3a; }

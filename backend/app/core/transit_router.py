@@ -152,6 +152,20 @@ def _journey(net: Network, origin: str, scan: _Scan) -> list[dict] | None:
     return None
 
 
+def latest_departures(net: Network, targets: dict[str, int], not_before: int) -> dict[str, int]:
+    """막차 자기장: 역마다 '늦어도 이 시각에 이 역에서 타면 목적지에 닿는다'(분).
+    같은 이름의 다른 노선으로 걸어가서 타는 편이 늦으면 그 시각을 쓴다. 목적지 역과 갈 수 없는 역은 빠진다"""
+    latest = _scan(net, targets, frozenset(), not_before).latest
+    out = {}
+    for node in net.nodes:
+        if node in targets:
+            continue
+        best = max((latest.get(x, NEG) - w for x, w in net.groups.get(node, [(node, 0)])), default=NEG)
+        if NEG < best < POS:
+            out[node] = int(best)
+    return out
+
+
 def leg_trains(net: Network, board: str, alight: str) -> list[tuple[int, int]]:
     """두 역 사이를 실제로 다니는 열차들의 (탄 역 출발, 내린 역 도착). 출발 순"""
     a, b = net.rows.get(board, {}), net.rows.get(alight, {})
