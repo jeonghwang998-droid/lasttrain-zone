@@ -15,10 +15,12 @@
     <link rel="stylesheet" href="../css/global.css" />
   </head>
   <body data-tab="me">
-    <main class="page">
+    <main class="page profile-page">
       <header class="topbar">
         <h1>내 정보</h1>
       </header>
+
+      <p class="sp-msg" id="loading" role="status"><span class="spin" aria-hidden="true"></span>불러오는 중이에요</p>
 
       <!-- 로그인 전 -->
       <section class="panel login-prompt" id="guest" hidden>
@@ -31,7 +33,7 @@
         </div>
       </section>
 
-      <!-- 로그인 후: 내 프로필 -->
+      <!-- 로그인 후: 내 프로필 (Supabase profiles) -->
       <section class="panel" id="profile" hidden>
         <div class="profile-head">
           <div class="avatar avatar-lg" id="avatar" aria-hidden="true"></div>
@@ -40,102 +42,75 @@
             <div class="profile-email" id="emailView"></div>
           </div>
         </div>
-
-        <form id="profile-form" class="stack">
+        <form id="profile-form" class="stack" novalidate>
           <div class="field">
             <label for="nickname">닉네임</label>
             <input type="text" id="nickname" maxlength="12" autocomplete="nickname" required />
           </div>
-          <div class="field">
-            <label for="home">집</label>
-            <select id="home"></select>
-          </div>
-          <p class="hint">집 위치는 나만 볼 수 있어요. 모임방에는 출발 시각만 공유돼요.</p>
           <p class="err" id="profile-error" role="alert"></p>
-          <button type="submit" class="btn btn-primary btn-block">저장</button>
+          <button type="submit" class="btn btn-primary btn-block" id="nickSave">닉네임 저장</button>
         </form>
       </section>
 
-      <!-- 서버 연결 확인: 로그인 토큰으로 백엔드가 나를 알아보는지 -->
-      <section class="panel" id="server-check" hidden>
-        <h2>서버 연결</h2>
-        <p class="hint" id="serverState">확인 중…</p>
-      </section>
-
-      <!-- 출발 설정 -->
-      <section class="panel">
-        <h2>출발 설정</h2>
-        <div class="field">
-          <label for="buffer">여유 시간</label>
-          <div>
-            <input type="range" id="buffer" min="0" max="20" step="1" value="5" />
-            <div class="rangeval" id="bufferVal"></div>
-          </div>
+      <!-- 우리집 (Supabase my_home). 바꾸기는 홈 화면의 집 설정(주소 검색, 현재 위치, 가까운 역 고르기)으로 -->
+      <section class="panel" id="home-panel" hidden>
+        <h2>우리집</h2>
+        <div class="home-chip pf-home">
+          <div class="hc-icon"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/></svg></div>
+          <div class="hc-text"><b id="homeName"></b><span id="homeStation"></span></div>
+          <a class="btn btn-sm" id="homeEdit" href="./dashboard.html?home=edit">바꾸기</a>
         </div>
+        <p class="hint">주소를 검색하거나 지금 위치로 찾은 뒤, 집에서 가까운 지하철역을 골라요. 집 위치는 나만 볼 수 있고, 모임에는 출발 시각만 공유돼요.</p>
       </section>
 
-      <!-- 알림 -->
-      <section class="panel">
+      <!-- 알림: 이 기기의 설정. 막차 알람과 모임 알람이 이 설정대로 울린다 -->
+      <section class="panel" id="notify-panel" hidden>
         <h2>알림</h2>
         <div class="list">
           <div class="list-row">
             <div>
-              <div class="t">브라우저 알림 권한</div>
-              <div class="s" id="permState">확인 중…</div>
+              <div class="t">알림 권한</div>
+              <div class="s" id="permState"></div>
             </div>
-            <button type="button" class="btn btn-sm" id="permBtn">허용하기</button>
+            <button type="button" class="btn btn-sm btn-primary" id="permBtn" hidden>허용하기</button>
           </div>
           <div class="list-row">
-            <div><div class="t">출발 30분 전</div></div>
-            <button type="button" class="toggle" data-notify="t30" aria-pressed="true" aria-label="출발 30분 전 알림"></button>
+            <div>
+              <div class="t">소리</div>
+              <div class="s">알람 시각에 삑삑 소리를 내요</div>
+            </div>
+            <button type="button" class="toggle" data-pref="sound" aria-pressed="true" aria-label="알람 소리"></button>
           </div>
           <div class="list-row">
-            <div><div class="t">출발 10분 전</div></div>
-            <button type="button" class="toggle" data-notify="t10" aria-pressed="true" aria-label="출발 10분 전 알림"></button>
+            <div>
+              <div class="t">진동</div>
+              <div class="s" id="vibrateNote">알람 시각에 진동해요</div>
+            </div>
+            <button type="button" class="toggle" data-pref="vibrate" aria-pressed="true" aria-label="진동"></button>
+          </div>
+          <div class="list-row">
+            <div><div class="t">일어나기 30분 전</div></div>
+            <button type="button" class="toggle" data-notify="t30" aria-pressed="true" aria-label="30분 전 알림"></button>
+          </div>
+          <div class="list-row">
+            <div><div class="t">일어나기 10분 전</div></div>
+            <button type="button" class="toggle" data-notify="t10" aria-pressed="true" aria-label="10분 전 알림"></button>
           </div>
           <div class="list-row">
             <div><div class="t">지금 일어나야 할 때</div></div>
-            <button type="button" class="toggle" data-notify="t0" aria-pressed="true" aria-label="출발 시각 알림"></button>
+            <button type="button" class="toggle" data-notify="t0" aria-pressed="true" aria-label="일어날 시각 알림"></button>
           </div>
           <div class="list-row">
             <div>
-              <div class="t">다 같이 일어나기 콜</div>
-              <div class="s">모임방에서 누군가 부르면 알려줘요</div>
-            </div>
-            <button type="button" class="toggle" data-notify="room" aria-pressed="true" aria-label="모임 콜 알림"></button>
-          </div>
-          <div class="list-row">
-            <div>
-              <div class="t">친구 귀가 완료</div>
-              <div class="s">모임 멤버가 집에 도착하면 알려줘요</div>
+              <div class="t">모임 멤버 귀가 완료</div>
+              <div class="s">알람을 켠 모임에서 멤버가 귀가 완료를 누르면 알려 줘요</div>
             </div>
             <button type="button" class="toggle" data-notify="arrived" aria-pressed="true" aria-label="귀가 완료 알림"></button>
           </div>
         </div>
-      </section>
-
-      <!-- 앱 -->
-      <section class="panel">
-        <h2>앱</h2>
-        <div class="list">
-          <div class="list-row" id="installRow" hidden>
-            <div>
-              <div class="t">홈 화면에 앱 설치</div>
-              <div class="s">앱처럼 바로 열 수 있어요</div>
-            </div>
-            <button type="button" class="btn btn-sm btn-primary" id="installBtn">설치</button>
-          </div>
-          <div class="list-row" id="iosHint" hidden>
-            <div>
-              <div class="t">홈 화면에 추가하기</div>
-              <div class="s">공유 버튼 → "홈 화면에 추가"를 눌러 주세요. 아이폰은 이렇게 설치해야 알림이 와요.</div>
-            </div>
-          </div>
-          <div class="list-row">
-            <div class="t">버전</div>
-            <div class="s">0.1.0</div>
-          </div>
-        </div>
+        <button type="button" class="btn btn-block" id="testBtn">알림 시험해 보기</button>
+        <p class="sp-msg" id="testResult" role="status"></p>
+        <p class="note">이 앱(또는 탭)이 열려 있을 때 울려요. 앱을 완전히 닫으면 울리지 않아요.</p>
       </section>
 
       <!-- 계정 -->

@@ -33,6 +33,11 @@ export async function loadProfile(uid) {
   return data
 }
 
+export async function saveNickname(uid, nickname) {
+  const { error } = await supabase.from('profiles').update({ nickname }).eq('id', uid)
+  if (error) throw error
+}
+
 export async function saveBuffer(uid, minutes) {
   const { error } = await supabase.from('profiles').update({ buffer_min: minutes }).eq('id', uid)
   if (error) throw error

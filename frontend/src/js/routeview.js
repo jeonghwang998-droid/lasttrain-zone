@@ -2,7 +2,7 @@
 // 화면 로직과 분리한 순수 함수라서 계산 결과(plans)만 넣으면 HTML 문자열이 나온다
 // 보여 주는 값은 전부 plans(= 교통 API 에서 받은 경로 + 역산 결과)에서 온다. 여기에 고정된 노선, 역, 시각은 없다
 
-import { fm } from './clock.js'
+import { fm, hhmm } from './clock.js'
 
 // 도착지가 내 집일 때 화면에 보이는 이름
 const HOME_LABEL = '우리집'
@@ -31,9 +31,9 @@ function rideItem(x, next) {
   else tag = `<span class="tag link">${esc(next.leg.name)} 막차에 맞춘 열차</span>`
 
   return (
-    `<li class="ride"${color ? ` style="--c:${color}"` : ''}>` +
+    `<li class="ride"${color ? ` style="--c:${color}"` : ''}><time>${fm(dep)}</time>` +
     `<div class="ride-top">${badge(leg)}<span class="stations">${stations}</span></div>` +
-    `<div class="ride-time"><b>${fm(dep)}</b> 출발 <span class="arr">→ ${fm(arr)} 도착 · ${arr - dep}분</span></div>` +
+    `<div class="ride-time"><span class="arr">${fm(arr)} 도착 · ${arr - dep}분</span></div>` +
     `<div class="ride-tags">${tag}${late ? `<span class="late">AI 예상 지연 최대 ${late}분</span>` : ''}</div>` +
     `</li>`
   )
@@ -45,7 +45,7 @@ function transferItem(x, next) {
   const tight = slack <= TIGHT_SLACK_MIN
   const where = x.leg.to ? `${esc(x.leg.to)} 환승` : '환승'
   return (
-    `<li class="xfer"><div class="xfer-top">${where}<span class="walk"> · 걸어서 ${x.leg.xfer}분</span></div>` +
+    `<li class="xfer"><time></time><div class="xfer-top">${where}<span class="walk"> · 걸어서 ${x.leg.xfer}분</span></div>` +
     `<div class="slack ${tight ? 'tight' : 'ok'}">${esc(next.leg.name)}까지 여유 ${slack}분${tight ? ' · 빠듯해요' : ''}</div></li>`
   )
 }
@@ -88,10 +88,10 @@ function timelineHtml(p, trip, ai) {
   const to = trip && trip.to ? (trip.to.isHome ? HOME_LABEL : trip.to.name) : ''
   return (
     `<ol class="timeline">` +
-    `<li class="node start"><div class="node-name">${esc(from) || '출발'}</div>` +
+    `<li class="node start"><time>${hhmm(p.leave)}</time><div class="node-name">${esc(from) || '출발'}</div>` +
     `<div class="node-sub">${p.route.board ? `${esc(p.route.board)}까지 ` : ''}걸어서 ${p.walk}분</div></li>` +
     steps +
-    `<li class="node end"><div class="node-name">${esc(to) || '도착'}</div><div class="node-sub">${fm(arrive)} 도착</div></li>` +
+    `<li class="node end"><time>${fm(arrive)}</time><div class="node-name">${esc(to) || '도착'}</div><div class="node-sub">${fm(arrive)} 도착</div></li>` +
     `</ol>${why && ai ? `<p class="why">${esc(why)}</p>` : ''}`
   )
 }
@@ -112,6 +112,16 @@ function routeItem(p, i, trip, ai, collapsible) {
   return collapsible
     ? `<li class="route alt" id="r${i}"><details><summary>${head}</summary>${body}</details></li>`
     : `<li class="route" id="r${i}">${head}${body}</li>`
+}
+
+// 지도 위 출발 카드에 붙는 노선 칩: 1호선 › 서해선 · 환승 1번
+export function lineChipsHtml(p) {
+  if (!p) return ''
+  const n = p.legs.length - 1
+  return (
+    p.legs.map((x) => badge(x.leg)).join('<span class="sep">›</span>') +
+    `<span class="chips-meta">${n ? `환승 ${n}번` : '환승 없음'} · ${fm(p.legs[n].arr)} 도착</span>`
+  )
 }
 
 // plans: 늦게 출발할 수 있는 순서. startIndex: 첫 카드의 번호

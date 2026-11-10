@@ -3,11 +3,11 @@
 
 import { WD, RAIN_BINS } from './data.js'
 import { S } from './state.js'
-import { hhmm, fm, left, nowSec, secToDate } from './clock.js'
+import { hhmm, fm, left, nowSec, secToDate, serviceDayStart } from './clock.js'
 import { plansFor } from './planner.js'
-import { fetchRoutes, routesNote, destinationStations, applyWalk, TRANSIT_CONNECTED } from './transit.js'
+import { fetchRoutes, routesNote, destinationStations, applyWalk, TRANSIT_CONNECTED, WALK_MAX_M } from './transit.js'
 import { loadDeadlines, zoneStations, zoneCircles, bestEscape } from './zone.js'
-import { routeCardsHtml, routesEmptyHtml, lastBoxHtml, restText } from './routeview.js'
+import { routeCardsHtml, routesEmptyHtml, lastBoxHtml, restText, lineChipsHtml } from './routeview.js'
 import * as Kakao from './kakao.js'
 import * as Home from './home.js'
 import { permissionState, onPermissionChange, getPosition, watchPosition, distanceM, WALK_DETOUR } from './geo.js'
@@ -17,6 +17,7 @@ import { sessionUserId, loadConfig, loadProfile, saveBuffer, loadTrips, addTrip,
 import * as Rooms from './rooms.js'
 import * as MyRoutes from './myroutes.js'
 import * as Subway from './subway.js'
+import { ring } from './notify.js'
 
 initApp()
 
@@ -24,6 +25,21 @@ const $ = (id) => document.getElementById(id)
 
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+// 서버나 지도 API 를 기다리는 동안 보여 주는 문구 (돌아가는 원 + 글자)
+const loadingHtml = (text) => `<span class="spin" aria-hidden="true"></span>${esc(text)}`
+const ROUTES_LOADING =
+  `<li class="route-loading"><p class="rl-title">${loadingHtml('막차 계산 중이에요')}</p>` +
+  '<p class="rl-sub">시간표에서 환승 연결을 하나씩 맞춰 보고 있어요. 조금만 기다려 주세요.</p>' +
+  '<i class="skel" style="width:55%"></i><i class="skel" style="width:85%"></i><i class="skel" style="width:70%"></i></li>'
+
+// 처음 화면을 덮고 있는 '불러오는 중'을 걷어 낸다
+function hideBoot() {
+  const el = $('boot')
+  if (!el || el.classList.contains('out')) return
+  el.classList.add('out')
+  setTimeout(() => el.remove(), 300)
+}
 
 /* ---------- 로그인 확인 ---------- */
 const uid = await sessionUserId()
@@ -39,6 +55,7 @@ let profile = null
 let trips = []
 let plans = []
 let rawPlans = []
+let routesLoading = false // 교통 API 에서 경로를 받아 막차를 계산하는 중
 
 let rooms = []
 let roomId = null
@@ -50,11 +67,6 @@ let toastTimer
 function showToast(msg, ms = 7000) {
   $('toastText').textContent = msg
   $('toast').classList.add('show')
-  try {
-    navigator.vibrate && navigator.vibrate([200, 100, 200])
-  } catch (e) {
-    /* 진동 미지원 */
-  }
   clearTimeout(toastTimer)
   toastTimer = setTimeout(() => $('toast').classList.remove('show'), ms)
 }
@@ -76,7 +88,12 @@ function renderMe() {
   $('rainVal').textContent = S.rain === 0 ? '안 와요' : `시간당 ${S.rain}mm`
 
   // 가장 늦게 출발할 수 있는 경로가 추천, 나머지는 늦게 출발할 수 있는 순서로 다른 경로
-  $('routes').innerHTML = plans.length ? routeCardsHtml(plans.slice(0, 1), S.trip, S.ai, 0) : routesEmptyHtml(S.trip, TRANSIT_CONNECTED, routesNote())
+  $('routes').innerHTML = routesLoading
+    ? ROUTES_LOADING
+    : plans.length
+      ? routeCardsHtml(plans.slice(0, 1), S.trip, S.ai, 0)
+      : routesEmptyHtml(S.trip, TRANSIT_CONNECTED, routesNote())
+  $('heroChips').innerHTML = lineChipsHtml(plans[0])
   const alts = plans.slice(1)
   $('altPanel').hidden = alts.length === 0
   $('alts').innerHTML = routeCardsHtml(alts, S.trip, S.ai, 1, true)
@@ -241,7 +258,7 @@ const lineOptions = () =>
 function prepareStationPicker() {
   if (!linesReady) {
     linesReady = (async () => {
-      $('spMsg').textContent = '노선 정보를 불러오는 중이에요…'
+      $('spMsg').innerHTML = loadingHtml('노선 정보를 불러오는 중이에요')
       $('spRetry').hidden = true
       try {
         subwayLines = await Subway.loadLines()
@@ -270,7 +287,7 @@ function fillStationSelect(lineSel, stationSel) {
 // 막차 정보를 box 안에 그린다 (isCurrent: 더 새로운 요청이 있으면 이 결과는 버린다)
 async function fillLastTrains(box, label, stationId, isCurrent) {
   box.hidden = false
-  box.innerHTML = '<p class="sp-load">막차를 확인하는 중이에요…</p>'
+  box.innerHTML = `<p class="sp-load">${loadingHtml('막차를 확인하는 중이에요')}</p>`
   try {
     const data = await Subway.loadLastTrains(stationId)
     if (!isCurrent()) return
@@ -345,7 +362,7 @@ async function pickHomePlace(p) {
   $('homePickedAddr').textContent = p.address && p.address !== p.name ? p.address : ''
   $('homeStep2').hidden = false
   $('homeStations').innerHTML = ''
-  $('homeMsg').textContent = '가까운 지하철역을 찾는 중이에요…'
+  $('homeMsg').innerHTML = loadingHtml('가까운 지하철역을 찾는 중이에요')
   await prepareStationPicker()
   if (!subwayLines) {
     $('homeMsg').textContent = $('spMsg').textContent || '노선 정보를 불러오지 못했어요.'
@@ -382,6 +399,8 @@ $('home-form').addEventListener('submit', async (e) => {
     return
   }
   $('homeErr').textContent = ''
+  $('homeResults').hidden = false
+  $('homeResults').innerHTML = `<li class="empty-row">${loadingHtml('주소를 찾는 중이에요')}</li>`
   const [byAddress, byPlace] = await Promise.all([Kakao.searchAddress(q), Kakao.searchPlaces(q, 5)])
   const seen = new Set()
   homeFound = [...byAddress, ...byPlace].filter((p) => {
@@ -478,6 +497,7 @@ async function loadMyRoutes() {
   if (!selectedRoute()) routeId = (savedRoutes.find((r) => r.id === recall(ROUTE_PICK_KEY)) || savedRoutes[0] || {}).id || null
   S.trip = tripOf(selectedRoute())
   remember(ROUTE_PICK_KEY, routeId)
+  pollRouteAlarms() // 경로를 더하거나 고치면 알람 시각도 다시 계산
 }
 
 function renderList() {
@@ -521,7 +541,7 @@ async function renderNearby() {
     box.innerHTML = `<p class="sp-msg">${geoState === 'unsupported' ? '이 기기는 위치 기능을 지원하지 않아요.' : '위치를 켜면 지금 있는 곳 근처 역이 여기에 나와요.'}</p>`
     return
   }
-  box.innerHTML = '<p class="sp-msg">근처 역을 찾는 중이에요…</p>'
+  box.innerHTML = `<p class="sp-msg">${loadingHtml('근처 역을 찾는 중이에요')}</p>`
   await prepareStationPicker()
   if (!subwayLines) {
     box.innerHTML = ''
@@ -745,6 +765,46 @@ $('routeAdd').addEventListener('click', () => openForm(null))
 $('tripCancel').addEventListener('click', closeForm)
 
 // 알람을 켜고 끈다. 켤 때 브라우저 알림 권한도 한 번 물어본다
+/* ----- 막차 알람: 알람을 켠 경로마다 일어날 시각을 계산해 두고 30분, 10분 전, 그 시각에 울린다 ----- */
+const ROUTE_ALARM_POLL_MS = 5 * 60000 // 열지 않은 경로의 일어날 시각을 다시 계산하는 간격
+const routeAlarms = new Map() // 경로 id -> { leave: 일어날 시각(초), name }
+const routeFired = {} // 이미 울린 경로 알람 ('경로|분|서비스 날')
+
+async function pollRouteAlarms() {
+  const on = savedRoutes.filter((r) => r.alarm_on)
+  for (const id of [...routeAlarms.keys()]) if (!on.some((r) => r.id === id)) routeAlarms.delete(id)
+  for (const r of on) {
+    const trip = tripOf(r)
+    if (!trip || (r.to_home && !home)) continue
+    try {
+      const best = plansFor(await fetchRoutes(trip, myPos), S.ai)[0]
+      if (best) routeAlarms.set(r.id, { leave: best.leave, name: routeTitle(r) })
+      else routeAlarms.delete(r.id)
+    } catch (e) {
+      console.error(e) // 다음 계산 때 다시 시도
+    }
+  }
+}
+
+// 매 0.25초: 상세 화면에 열린 경로는 지금 화면의 계산(plans)을, 나머지는 뒤에서 계산한 값을 쓴다
+function checkRouteAlarms(now) {
+  const day = serviceDayStart()
+  for (const r of savedRoutes) {
+    if (!r.alarm_on) continue
+    const live = r.id === routeId && plans[0]
+    const a = live ? { leave: plans[0].leave, name: routeTitle(r) } : routeAlarms.get(r.id)
+    if (!a) continue
+    const rest = a.leave - now
+    for (const t of [30, 10, 0]) {
+      const key = `${r.id}|${t}|${day}`
+      if (rest <= t * 60 && rest > -120 && !routeFired[key]) {
+        routeFired[key] = 1
+        if (getPrefs().notify['t' + t]) alertUser(`[${a.name}] ${MSG[t]}`, `lz-route-${r.id}`)
+      }
+    }
+  }
+}
+
 async function toggleAlarm(id) {
   const r = savedRoutes.find((x) => x.id === id)
   if (!r) return
@@ -761,6 +821,7 @@ async function toggleAlarm(id) {
   r.alarm_on = on
   renderMeScreen()
   syncDetailHead()
+  pollRouteAlarms()
   showToast(on ? '알람을 켰어요. 앱이 열려 있는 동안 출발 시각이 가까워지면 알려 드려요.' : '알람을 껐어요.', 4000)
 }
 
@@ -801,35 +862,50 @@ function syncDetailHead() {
   $('detailAlarm').setAttribute('aria-pressed', r.alarm_on)
 }
 
+// 지도 칸 보이기/숨기기. 숨기면 출발 카드가 지도 위에 겹치지 않고 위로 올라간다
+function showMap(on) {
+  $('routeMap').hidden = !on
+  $('mapWrap').hidden = !on
+}
+
 async function drawRouteMap() {
   const t = S.trip
   if (!t) return
-  const mapEl = $('routeMap')
   $('mapMsg').textContent = ''
   if (!Kakao.KAKAO_CONNECTED) {
-    mapEl.hidden = true
+    showMap(false)
     $('mapMsg').textContent = '지도를 쓰려면 카카오 지도 키가 필요해요.'
     return
   }
+  showMap(true)
+  $('mapLoading').hidden = false
+  try {
+    await drawRouteMapInner(t)
+  } finally {
+    $('mapLoading').hidden = true
+  }
+  renderLive()
+}
+
+async function drawRouteMapInner(t) {
+  const mapEl = $('routeMap')
   await ensureStationCoords(t.from)
   const points = []
   if (myPos) points.push({ lat: myPos.lat, lng: myPos.lng, kind: 'me', label: '내 위치' })
   if (t.from.lat != null) points.push({ lat: t.from.lat, lng: t.from.lng, kind: 'from', label: t.from.name.replace(/\s*\(.*\)\s*$/, '') })
   if (t.to.lat != null) points.push({ lat: t.to.lat, lng: t.to.lng, kind: t.to.isHome ? 'home' : 'to', label: t.to.isHome ? HOME_NAME : t.to.name })
   if (!points.length) {
-    mapEl.hidden = true
+    showMap(false)
     $('mapMsg').textContent = '지도에 표시할 위치가 없어요. 위치를 켜거나, 출발역을 검색해서 다시 등록해 보세요.'
     return
   }
-  mapEl.hidden = false
   mapHandle = await Kakao.drawMap(mapEl, points)
   if (!mapHandle) {
-    mapEl.hidden = true
+    showMap(false)
     $('mapMsg').textContent = '지도를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'
   } else if (!myPos) {
     $('mapMsg').textContent = '위치를 켜면 지도에 내 위치도 보여 드려요.'
   }
-  renderLive()
 }
 
 /* ----- 실시간: 지금 위치에서 출발역까지 걷기, 막차 자기장 ----- */
@@ -910,7 +986,7 @@ function renderLive() {
   if (mapHandle) mapHandle.setZone(circles)
 
   const st = $('zoneStatus')
-  if (zone.loading) st.textContent = '막차 자기장을 계산하는 중이에요…'
+  if (zone.loading) st.innerHTML = loadingHtml('막차 자기장을 계산하는 중이에요')
   else if (zone.note) st.textContent = zone.note
   else if (!zone.stations.length) st.textContent = '내 주변에서 집으로 갈 수 있는 역을 찾지 못했어요.'
   else if (!circles.length) st.innerHTML = '<b class="out">귀가 가능 구역이 모두 사라졌어요.</b> 택시나 심야버스를 알아보세요.'
@@ -932,8 +1008,16 @@ function renderWalkCard(nowMin) {
   if (!show) return
   const meters = distanceM(myPos, from) * WALK_DETOUR
   const walkMin = Math.max(1, Math.ceil(meters / walkSpeed()))
+  const dist = meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`
   $('walkTitle').textContent = `지금 위치 → ${from.name}`
-  $('walkSub').textContent = `약 ${meters >= 1000 ? `${(meters / 1000).toFixed(1)}km` : `${Math.round(meters)}m`} · 지금 출발하면 ${hhmm((nowMin + walkMin) * 60)} 도착`
+  // 걸어갈 거리가 아니면 걷는 시간은 빼고, 일어날 시각은 출발역 기준이라고 알린다 (transit.applyWalk 와 같은 기준)
+  if (meters > WALK_MAX_M) {
+    $('walkSub').textContent = `약 ${dist} · 걸어가기엔 멀어요`
+    $('walkMin').textContent = '--'
+    $('walkTrain').textContent = `출발역에서 멀리 있어서, 일어날 시각은 ${from.name}에 있다고 보고 계산했어요. 역 2km 안으로 오면 걷는 시간까지 넣어 다시 계산해요.`
+    return
+  }
+  $('walkSub').textContent = `약 ${dist} · 지금 출발하면 ${hhmm((nowMin + walkMin) * 60)} 도착`
   $('walkMin').textContent = walkMin
   const first = plans[0] && plans[0].legs[0]
   if (!first) {
@@ -959,17 +1043,21 @@ function renderLast() {
   fillLastTrains($('lastBody'), from.name, from.stationId, () => mine === lastSeq)
 }
 
+let routesSeq = 0
 async function loadRoutes() {
-  if (!S.trip) {
-    S.routes = []
-    return
-  }
+  const mine = ++routesSeq
+  S.routes = []
+  if (!S.trip) return
+  routesLoading = true
+  renderMe()
   try {
-    S.routes = await fetchRoutes(S.trip, myPos)
+    const routes = await fetchRoutes(S.trip, myPos)
+    if (mine === routesSeq) S.routes = routes
   } catch (e) {
     console.error(e)
-    S.routes = []
-    showToast('경로를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', 6000)
+    if (mine === routesSeq) showToast('경로를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', 6000)
+  } finally {
+    if (mine === routesSeq) routesLoading = false
   }
 }
 
@@ -1001,16 +1089,10 @@ $('detailAlarm').addEventListener('click', () => {
   if (routeId) toggleAlarm(routeId)
 })
 
-// 알림: 토스트와, 권한이 있고 화면이 가려져 있으면 브라우저 알림
-function alertUser(msg) {
+// 알람: 화면 위 안내 + 소리, 진동, 시스템 알림 (내 정보의 알림 설정대로)
+function alertUser(msg, tag) {
   showToast(msg)
-  try {
-    if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-      new Notification('막차 자기장', { body: msg })
-    }
-  } catch (e) {
-    /* 알림을 못 띄우는 환경 */
-  }
+  ring(msg, tag).catch((e) => console.error(e))
 }
 
 /* ---------- 우리 테이블 ---------- */
@@ -1034,6 +1116,19 @@ let roomPlanSeq = 0
 let sharedLeave = null // 마지막으로 모임에 알린 내 출발 시각(ms)
 const alarmDeadlines = new Map() // 모임 id -> { at: Date, name } (알람을 켠 모임들)
 const roomFired = {} // 이미 울린 모임 알람
+const lastStatus = new Map() // '모임 id|멤버 id' -> 지난번에 본 상태 (귀가 완료로 바뀌는 순간을 알기 위해)
+
+// 알람을 켠 모임에서 다른 멤버가 귀가 완료로 바뀌면 알린다. 처음 본 상태는 기억만 한다
+function noticeArrivals(id, list, name) {
+  for (const m of list) {
+    const key = `${id}|${m.userId}`
+    const before = lastStatus.get(key)
+    lastStatus.set(key, m.status)
+    if (before && before !== 'arrived' && m.status === 'arrived' && m.userId !== uid && getPrefs().notify.arrived) {
+      alertUser(`[${name}] ${m.nickname}님이 집에 도착했어요.`, `lz-arrived-${key}`)
+    }
+  }
+}
 
 const currentRoom = () => rooms.find((r) => r.id === roomId)
 const clockOf = (date) => date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
@@ -1083,6 +1178,8 @@ async function enterRoom(id) {
   $('roomErr').textContent = ''
   $('myRoomRoute').innerHTML = ''
   $('roomMap').hidden = true
+  members = []
+  $('people').innerHTML = `<li class="people-loading">${loadingHtml('멤버를 불러오는 중이에요')}</li>`
   try {
     mySettings = await Rooms.mySettings(id, uid)
   } catch (e) {
@@ -1129,6 +1226,7 @@ async function refreshRoom() {
   if (room && mySettings && mySettings.alarm_on) {
     if (g) alarmDeadlines.set(id, { at: g.at, name: room.place_label || '모임' })
     else alarmDeadlines.delete(id)
+    noticeArrivals(id, members, room.place_label || '모임')
   }
   renderRoom()
 }
@@ -1184,7 +1282,8 @@ function roomTick() {
   if (!g) {
     $('gTime').textContent = '--:--'
     const allHome = members.length > 0 && members.every((m) => m.status === 'arrived')
-    $('gCount').textContent = allHome ? '모두 귀가했어요' : '멤버들의 막차를 계산하는 중이에요'
+    if (allHome) $('gCount').textContent = '모두 귀가했어요'
+    else $('gCount').innerHTML = loadingHtml('멤버들의 막차 계산 중이에요')
     $('gWho').textContent = allHome ? '' : '각자 이 모임을 열면 출발 시각이 공유돼요'
   } else {
     const r = (g.at - Date.now()) / 1000
@@ -1205,7 +1304,7 @@ function checkRoomAlarms() {
       const key = `${id}|${+at}|${t}`
       if (r <= t * 60 && r > -120 && !roomFired[key]) {
         roomFired[key] = 1
-        if (getPrefs().notify['t' + t]) alertUser(`[${name}] ${ROOM_MSG[t]}`)
+        if (getPrefs().notify['t' + t]) alertUser(`[${name}] ${ROOM_MSG[t]}`, `lz-room-${id}`)
       }
     }
   }
@@ -1227,6 +1326,7 @@ async function pollRoomAlarms() {
     const g = groupDeadline(list)
     if (g) alarmDeadlines.set(id, { at: g.at, name: room.place_label || '모임' })
     else alarmDeadlines.delete(id)
+    noticeArrivals(id, list, room.place_label || '모임')
   }
 }
 
@@ -1280,7 +1380,7 @@ async function planMyRoomRoute() {
     $('roomLocBtn').hidden = geoState === 'unsupported'
     return
   }
-  msg.textContent = '내 막차를 계산하는 중이에요…'
+  msg.innerHTML = loadingHtml('막차 계산 중이에요')
   await prepareStationPicker()
   const near = subwayLines ? await Kakao.nearbyStations(myPos.lat, myPos.lng, NEARBY_RADIUS_M, NEARBY_LIMIT) : []
   const st = near.map((n) => ({ n, m: Subway.matchStation(subwayLines, n) })).find((x) => x.m)
@@ -1570,24 +1670,13 @@ function tick() {
       $('heroTime').textContent = '택시나 심야버스를 찾아보세요'
       $('heroCount').textContent = `${hhmm(b.leave)}에 출발했어야 했어요`
     } else {
-      $('heroLead').textContent = '이때 일어나면 막차 탑니다'
+      $('heroLead').textContent = '막차 타려면 이때 일어나기'
       $('heroTime').textContent = hhmm(b.leave)
       $('heroCount').textContent = `앞으로 ${left(r)}`
     }
     const pct = Math.max(0, Math.min(1, 1 - r / 3600)) * 100
     $('train').style.left = pct + '%'
     $('done').style.width = pct + '%'
-
-    const key = [S.buffer, S.ai, S.wd, S.rain, b.leave].join('|')
-    let hit
-    ;[30, 10, 0].forEach((t) => {
-      if (r <= t * 60 && r > -120 && !S.fired[key + t]) {
-        S.fired[key + t] = 1
-        hit = t
-      }
-    })
-    const route = selectedRoute()
-    if (hit !== undefined && route && route.alarm_on && getPrefs().notify['t' + hit]) alertUser(MSG[hit])
 
     plans.forEach((p, i) => {
       const el = $('rs' + i)
@@ -1596,6 +1685,11 @@ function tick() {
       el.textContent = rr < 0 ? '놓침' : hhmm(p.leave)
       $('r' + i).classList.toggle('gone', rr < 0)
     })
+  } else if (routesLoading) {
+    document.body.dataset.level = 'calm'
+    $('heroLead').innerHTML = loadingHtml('막차 계산 중이에요')
+    $('heroTime').textContent = '--:--'
+    $('heroCount').textContent = '시간표를 거꾸로 따라가며 일어날 시각을 찾고 있어요'
   } else {
     document.body.dataset.level = 'calm'
     $('heroLead').textContent = TRANSIT_CONNECTED ? '탈 수 있는 막차가 없어요' : '막차 정보를 불러올 수 없어요'
@@ -1603,6 +1697,9 @@ function tick() {
     $('heroCount').textContent = TRANSIT_CONNECTED ? '' : '교통 정보 연결 후 출발 시각이 계산돼요'
   }
 
+  $('heroTime').classList.toggle('loading', routesLoading && !b)
+
+  checkRouteAlarms(now)
   roomTick()
   checkRoomAlarms()
 }
@@ -1653,6 +1750,7 @@ async function init() {
       location.replace(url('index.html'))
       return
     }
+    hideBoot()
     showToast('내 정보를 불러오지 못했어요. 새로고침해 주세요.', 8000)
     return
   }
@@ -1679,15 +1777,24 @@ async function init() {
   }
   await loadMyRoutes()
   initGeo().catch((e) => console.error(e))
+  const params = new URLSearchParams(location.search)
+  if (params.get('home') === 'edit') {
+    editingHome = true
+    screen = 'list'
+    resetHomeSetup()
+    params.delete('home')
+    history.replaceState(null, '', location.pathname + (params.toString() ? `?${params}` : ''))
+  }
   renderMeScreen()
   // 새로고침해도 보던 경로 화면에 머문다
-  const lastOpen = recall('lz_screen:' + uid)
-  if (lastOpen && home && savedRoutes.some((r) => r.id === lastOpen)) await openRoute(lastOpen)
+  const lastOpen = editingHome ? null : recall('lz_screen:' + uid)
+  const opening = lastOpen && home && savedRoutes.some((r) => r.id === lastOpen) ? openRoute(lastOpen) : null
+  hideBoot() // 경로 화면은 열어 두고, 막차 계산은 화면 안에서 '계산 중'으로 보여 준다
+  if (opening) await opening
 
   renderWalk()
   renderMe()
   await loadRooms()
-  const params = new URLSearchParams(location.search)
   const wanted = params.get('room')
   if (wanted && rooms.some((r) => r.id === wanted)) await enterRoom(wanted)
   let savedTab = null
@@ -1738,3 +1845,5 @@ setInterval(() => {
 // 알람을 켠 모임들의 다 같이 일어날 시각 (모임 화면 밖에서도)
 pollRoomAlarms()
 setInterval(pollRoomAlarms, ROOM_ALARM_POLL_MS)
+// 알람을 켠 경로들 (열지 않은 경로도)
+setInterval(pollRouteAlarms, ROUTE_ALARM_POLL_MS)

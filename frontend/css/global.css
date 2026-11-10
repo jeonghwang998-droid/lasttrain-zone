@@ -995,3 +995,167 @@ input[type='range'] { width: 100%; accent-color: var(--calm); }
 .m-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
 .m-dot.first { width: 10px; height: 10px; background: var(--danger); box-shadow: 0 0 0 4px #fdebec; }
 .people .ico.ok { width: 20px; height: 20px; color: #1a6b3a; }
+
+/* ==========================================================
+   앱 화면 다듬기: 첫 화면(index) 예시 화면과 같은 모양
+   지도 위 출발 카드, 시각 열이 있는 타임라인, 둥근 카드, 불러오는 중 표시
+   ========================================================== */
+:root { --shadow: 0 12px 32px -20px rgba(16, 24, 40, 0.28); }
+
+.panel { border-radius: 20px; box-shadow: var(--shadow); }
+.panel h2 { font-size: 16px; }
+.seg { box-shadow: var(--shadow); }
+.detail-head .dh-text h2 { font-size: 22px; }
+
+/* 두 칸 묶음: 휴대폰에서는 그냥 위아래로 */
+.col-main > * + *,
+.col-side > * + * { margin-top: 16px; }
+.detail-grid > .col-side { margin-top: 16px; }
+
+/* 지도 + 그 위에 겹친 출발 카드 */
+.map-panel { padding: 0 0 4px; }
+.map-wrap { position: relative; isolation: isolate; }
+.map-wrap .route-map { height: 360px; }
+.map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: var(--muted);
+  background: rgba(238, 241, 245, 0.88);
+}
+.map-sheet {
+  position: relative;
+  z-index: 1;
+  margin: -84px 12px 0;
+  padding: 16px 18px 14px;
+  background: var(--surface);
+  border-radius: 20px;
+  box-shadow: 0 12px 32px -10px rgba(16, 24, 40, 0.3);
+}
+.map-wrap[hidden] + .map-sheet { margin-top: 12px; box-shadow: none; border: 1px solid var(--line); }
+.map-sheet .lead { font-size: 13px; }
+.map-sheet .big { margin: 2px 0 4px; font-size: clamp(52px, 16vw, 68px); }
+.map-sheet .count { font-size: 16px; }
+.map-sheet .track { margin-top: 14px; }
+.hero-chips { margin-top: 10px; }
+.hero-chips:empty { display: none; }
+.chips-meta { margin-left: auto; padding-left: 8px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.hero .big.loading { color: var(--line); animation: pulse 1.4s ease-in-out infinite; }
+.zone-bar { border-top: 0; padding-top: 14px; }
+
+/* 경로 카드: 큰 출발 시각, 시각 열이 있는 타임라인 */
+.routes > li.route { background: var(--surface); border-radius: 18px; }
+.route-leave .st { font-size: 26px; }
+.route-leave small { font-size: 12px; }
+.timeline > li { padding-left: 80px; }
+.timeline > li > time {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 54px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.timeline > li::before { left: 66px; }
+.timeline > .node::after { left: 61px; }
+.timeline > .xfer::after { left: 62px; }
+.ride-time { margin-top: 0; }
+.ride-time .arr { font-size: 13px; }
+
+/* 막차 알람 목록: 아이폰 알람처럼 큰 글씨 + 스위치 */
+.alarm-row { padding: 16px 0 10px; }
+.al-title { font-size: 22px; }
+
+/* 모임: 마지노선 카드와 멤버 */
+.group-hero .lead { font-size: 13px; }
+.group-hero .big { font-size: clamp(56px, 18vw, 80px); }
+.room-people li { padding: 14px 4px; }
+.room-people li:last-child { border-bottom: 0; }
+.room-people li.first { margin: 0 -8px; padding-left: 12px; padding-right: 12px; background: #fdf3f3; border-radius: 12px; border-bottom-color: transparent; }
+.room-people .when { font-size: 15px; font-weight: 700; }
+.people-loading { display: block !important; font-size: 14px; color: var(--muted); }
+
+/* 불러오는 중: 돌아가는 원, 자리 표시 막대, 첫 화면 */
+.spin {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid var(--line);
+  border-top-color: var(--calm);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.spin.lg { width: 28px; height: 28px; margin: 0; border-width: 3px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: 0.45; } }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.route-loading { padding: 18px; background: var(--bg); border: 1px solid var(--line); border-radius: 18px; list-style: none; }
+.route-loading .rl-title { margin: 0; font-weight: 700; }
+.route-loading .rl-sub { margin: 4px 0 12px; font-size: 13px; color: var(--muted); }
+.skel {
+  display: block;
+  height: 12px;
+  margin-top: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, #f7f9fb 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: var(--bg);
+  transition: opacity 0.25s ease;
+}
+.boot img { width: 64px; height: 64px; border-radius: 18px; box-shadow: var(--shadow); }
+.boot p { margin: 0; font-size: 14px; color: var(--muted); }
+.boot.out { opacity: 0; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin, .skel, .hero .big.loading { animation-duration: 3s; }
+}
+
+/* 노트북: 넓게, 경로 상세와 모임은 두 칸 */
+@media (min-width: 960px) {
+  .page.app { max-width: 1120px; padding: 0 32px 64px; }
+  .page.app .topbar { margin: 0 -32px; padding-left: 32px; padding-right: 32px; }
+  .page.app .seg { max-width: 420px; }
+  .detail-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+  .detail-grid > .col-side { margin-top: 0; }
+  .map-wrap .route-map { height: 480px; }
+  .map-sheet { margin: -100px 20px 0; padding: 20px 24px 16px; }
+  #home-setup, #me-list, #loc-card, #view-walk > * { max-width: 720px; margin-left: auto; margin-right: auto; }
+  .group-list { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .group-list > * { margin: 0 !important; }
+  #channel-panel { grid-column: 1 / -1; }
+}
+/* 막차 계산 중: 진행 막대는 숨기고 안내 문구는 작게 */
+.hero .big.loading ~ .count { font-size: 14px; color: var(--muted); }
+.hero .big.loading ~ .track,
+.hero .big.loading ~ .tracklabels { display: none; }
+
+/* 내 정보: 우리집, 알림 시험 */
+.profile-page > .sp-msg { margin-top: 24px; text-align: center; }
+.pf-home { margin: 0 0 4px; padding: 0; box-shadow: none; }
+.pf-home .hc-text span { white-space: normal; }
+.pf-home .btn { flex: none; }
+#testBtn { margin-top: 14px; }
+.list-row .toggle:disabled { opacity: 0.4; cursor: default; }

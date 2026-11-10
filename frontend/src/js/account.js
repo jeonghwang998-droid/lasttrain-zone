@@ -10,8 +10,9 @@ const PROFILES_KEY = 'lz_profiles' // { [email]: { email, nickname, home, create
 const PREFS_KEY = 'lz_prefs' // 이 기기의 설정 (로그인과 무관)
 
 export const DEFAULT_PREFS = {
-  buffer: 5, // 여유 시간(분)
-  notify: { t30: true, t10: true, t0: true, room: true, arrived: true },
+  sound: true, // 알람 소리
+  vibrate: true, // 진동 (안드로이드만)
+  notify: { t30: true, t10: true, t0: true, arrived: true }, // 30분 전, 10분 전, 일어날 때, 모임 멤버 귀가 완료
 }
 
 function read(key, fallback) {
@@ -79,7 +80,7 @@ export async function login({ email, password }) {
 
   const { data: row } = await supabase.from('profiles').select('nickname').eq('id', data.user.id).maybeSingle()
   const nickname = (row && row.nickname) || data.user.user_metadata?.nickname || email.split('@')[0]
-  const profile = { email, nickname, home: getLocalProfile(email)?.home || 'ansan', createdAt: Date.now() }
+  const profile = { email, nickname, createdAt: Date.now() }
   saveProfile(profile)
   write(SESSION_KEY, email)
   return { profile }
@@ -88,10 +89,6 @@ export async function login({ email, password }) {
 export async function logout() {
   await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
   remove(SESSION_KEY)
-}
-
-function getLocalProfile(email) {
-  return read(PROFILES_KEY, {})[email]
 }
 
 // Supabase 오류를 한국어 문구로 바꾼다. 모르는 오류도 영어 원문은 화면에 보여 주지 않고 콘솔에만 남긴다

@@ -71,9 +71,14 @@ export async function fetchRoutes(trip, myPos) {
   return applyWalk(res.routes, myPos, trip.from)
 }
 
+// 출발역에서 이보다 멀리 있으면 걸어서 갈 거리가 아니다 (아직 모임 장소에 가기 전, 집 등).
+// 그때는 걷는 시간을 빼지 않고 출발역에 있다고 보고 일어날 시각을 계산한다
+export const WALK_MAX_M = 2000
+
 // 지금 위치에서 첫 탑승역까지 걷는 거리(m)를 경로마다 넣는다. 위치가 바뀌면 다시 불러 일어날 시각을 고친다
 export function applyWalk(routes, myPos, from) {
-  const walkM = myPos && from.lat != null ? Math.round(distanceM(myPos, from) * WALK_DETOUR) : 0
+  const meters = myPos && from.lat != null ? Math.round(distanceM(myPos, from) * WALK_DETOUR) : 0
+  const walkM = meters <= WALK_MAX_M ? meters : 0
   routes.forEach((r) => {
     r.walkM = walkM
   })
