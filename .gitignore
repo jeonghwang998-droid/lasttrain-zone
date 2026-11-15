@@ -16,6 +16,8 @@ venv/
 .pytest_cache/
 
 # ML 수집 데이터 (용량 큼)
+# 학습한 모델 파일 (ml/train.py 가 만든다. 다시 학습하면 생긴다)
+backend/app/ml/models/*.joblib
 ml/data/*
 !ml/data/.gitkeep
 

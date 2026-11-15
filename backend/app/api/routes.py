@@ -4,10 +4,14 @@
      walk 는 어느 역에서 내릴지 고르는 데만 쓰고 응답에는 넣지 않는다
      역 id 는 공공데이터(TAGO) 역 id 다 (화면이 이미 쓰는 것)
 응답: { routes: [...], day, note }  routes 의 모양은 frontend/src/js/transit.js 주석과 같다
+     구간마다 alightKey(내리는 역의 KRIC 역 키)가 있다 → 막차 확률(POST /api/route-probability)에 그대로 보낸다
+
+막차 확률: POST /api/route-probability  { legs: [{ line_name, station_key, station_name, arrive_min, walk_min, next_depart_min }] }
+     환승마다 하나. 응답 { probability, grade, legs: [...], model } (모델이 없으면 probability 는 null)
 """
 import re
 import statistics
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, current_app, jsonify, request
 
@@ -16,6 +20,7 @@ from ..config import Config
 from ..core import subway as subway_core
 from ..core import transit_router as router
 from ..core.last_train import SERVICE_DAY_START
+from ..ml import delay_model
 from ..services import kric_client as kric
 from ..services import kric_network as kric_net
 
@@ -92,6 +97,7 @@ def _to_response(net: router.Network, legs: list[dict]) -> dict:
                 "ride": round(statistics.median(a - d for d, a in trains)) if trains else 0,
                 "xfer": leg["walk"],
                 "line": _base_line_name(line_name),
+                "alightKey": leg["alight"],
             }
         )
     return {
@@ -125,3 +131,48 @@ def find():
 
     found = router.find_routes(net, origin_node, targets, _now_service_minutes())
     return jsonify(routes=[_to_response(net, legs) for legs in found], day=day_label, note="")
+
+
+KEY_PATTERN = re.compile(r"[A-Za-z0-9|-]{1,40}")
+MAX_PROB_LEGS = 8  # 한 경로의 환승 수 상한 (요청 검사용)
+MAX_TEXT = 40
+
+
+def _parse_prob_legs(raw) -> list[dict] | None:
+    if not isinstance(raw, list) or len(raw) > MAX_PROB_LEGS:
+        return None
+    out = []
+    for g in raw:
+        try:
+            key = str(g["station_key"])
+            leg = {
+                "line_name": str(g["line_name"])[:MAX_TEXT],
+                "station_key": key,
+                "station_name": str(g.get("station_name") or "")[:MAX_TEXT],
+                "arrive_min": int(g["arrive_min"]),
+                "walk_min": float(g["walk_min"]),
+                "next_depart_min": int(g["next_depart_min"]),
+            }
+        except (KeyError, TypeError, ValueError):
+            return None
+        if not KEY_PATTERN.fullmatch(key):
+            return None
+        out.append(leg)
+    return out
+
+
+@bp.post("/route-probability")
+@require_auth
+def route_probability():
+    legs = _parse_prob_legs((request.get_json(silent=True) or {}).get("legs"))
+    if legs is None:
+        return jsonify(error="환승 구간 정보를 확인해 주세요."), 400
+    model = delay_model.active()
+    if model is None:
+        empty = {"probability": None, "grade": "데이터부족", "expected_delay_min": None, "risk_delay_min": None,
+                 "reason": delay_model.status(), "level": "none"}
+        return jsonify(probability=None, grade="데이터부족", legs=[empty for _ in legs], model=None)
+    weekday = (datetime.now(subway_core.KST) - timedelta(hours=SERVICE_DAY_START)).weekday()  # 운행일 요일
+    res = model.route(legs, weekday)
+    res["model"] = {"version": model.version, "fake": model.fake}
+    return jsonify(res)

@@ -28,7 +28,8 @@ def create_app() -> Flask:
     for bp in (health_bp, me_bp, subway_bp, routes_bp, plan_bp, zone_bp, rooms_bp, push_bp, walk_bp):
         app.register_blueprint(bp, url_prefix="/api")
 
-    # TODO: 서버 시작 시 1회 적재
-    #   - backend/data/stations.csv, timetables/ → 메모리 (core/zone.py 에서 사용)
-    #   - ml/models/delay_model.joblib → DelayPredictor
+    # 지연 예측 모델: DB ml_models 의 활성 모델을 뒤에서 불러온다 (없거나 실패해도 서버는 뜬다, 확률만 null)
+    from .ml import delay_model
+
+    delay_model.start_loading()
     return app

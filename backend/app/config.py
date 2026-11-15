@@ -34,7 +34,7 @@ class Config:
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173,http://localhost:5500,http://127.0.0.1:5500")
 
     DATA_DIR = BASE_DIR / "data"
-    MODEL_PATH = BASE_DIR / "app" / "ml" / "models" / "delay_model.joblib"
+    MODELS_DIR = BASE_DIR / "app" / "ml" / "models"  # 학습한 지연 예측 모델 파일 (ml/train.py 가 저장, git 제외)
 
     # 서비스 기본값
     DEFAULT_BUFFER_MIN = 5
