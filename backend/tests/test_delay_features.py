@@ -93,3 +93,32 @@ def test_load_active_survives_db_failure(monkeypatch):
     delay_model.load_active()
     assert delay_model.active() is None
     assert "불러오지 못했어요" in delay_model.status()
+
+
+def test_is_dep_feature_defaults_to_arrival():
+    rows = pd.DataFrame({"line_name": ["A선", "A선"], "station_key": ["a1", "a1"], "hour": [23, 23],
+                         "weekday": [4, 4], "event": ["arr", "dep"]})
+    assert list(make_features(rows)["is_dep"]) == [0, 1]
+    assert (make_features(rows.drop(columns="event"))["is_dep"] == 0).all()  # 앱 예측은 늘 도착 기준
+
+
+def test_active_version_changed(monkeypatch):
+    from app.ml import delay_model
+    from app.services import db
+
+    monkeypatch.setattr(delay_model, "_active", DelayModelStub("v1"))
+    monkeypatch.setattr(db, "select", lambda *a, **k: [{"version": "v1"}])
+    assert delay_model.active_version_changed() is False
+    monkeypatch.setattr(db, "select", lambda *a, **k: [{"version": "v2"}])
+    assert delay_model.active_version_changed() is True
+
+    def boom(*a, **k):
+        raise db.DbError("연결 실패")
+
+    monkeypatch.setattr(db, "select", boom)
+    assert delay_model.active_version_changed() is False  # DB 를 못 읽으면 지금 모델 유지
+
+
+class DelayModelStub:
+    def __init__(self, version):
+        self.version = version

@@ -30,3 +30,4 @@ Thumbs.db
 backend/data/subway_catalog.json
 # 받아 둔 KRIC 노선/시간표 (build_network.py)
 backend/data/kric/
+ml/logs/

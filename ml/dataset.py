@@ -36,6 +36,7 @@ COLUMNS = [
     "delay_min",      # 지연(분) = 실제 도착 − 시간표 도착
     "hour",           # 시간대 (24, 25 = 자정 넘은 0시, 1시)
     "weekday",        # 요일 0=월 … 6=일 (운행일 기준)
+    "event",          # 'arr' 도착 / 'dep' 출발 (가짜 데이터는 모두 도착)
 ]
 
 
@@ -43,6 +44,8 @@ def _load_fake() -> pd.DataFrame:
     if not FAKE_PATH.exists():
         raise SystemExit(f"가짜 데이터가 없어요. 먼저 python ml/make_fake_data.py 를 실행해 주세요. ({FAKE_PATH})")
     df = pd.read_csv(FAKE_PATH, dtype={"train_no": str, "station_key": str, "tago_id": str})
+    if "event" not in df:
+        df["event"] = "arr"
     rng = db.config_value("ml.delay_valid_range")
     return df[df["delay_min"].between(rng["min"], rng["max"])]
 

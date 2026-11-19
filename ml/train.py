@@ -6,12 +6,15 @@
    - 기록이 ml.min_samples 보다 적은 역은 역 정보를 지워 노선 단위로 학습한다
 4) 비교 기준(baseline): (노선, 시간대)별 학습 기간의 지연 분위수 (없으면 노선 → 전체)
 5) 시험 기간 예측 (모델 / baseline) → 검증 리포트 ml/reports/ (ml/report.py)
-6) 모델 파일 저장(backend/app/ml/models/<버전>.joblib) → DB ml_models 등록 → --activate 면 활성화
+6) 모델 파일 저장(backend/app/ml/models/<버전>.joblib) → DB ml_models 등록 → 활성화
+   --activate : 무조건 활성화
+   --auto     : 같은 시험 기간에서 baseline 과 지금 활성 모델보다 Brier 점수가 나을 때만 활성화 (매주 자동 학습용)
 
 정책값(분위수, 최소 기록 수, 시험 기간)은 코드에 쓰지 않고 app_config 에서 읽는다.
 특징은 backend/app/ml/features.py 하나만 쓴다.
 
 실행 (저장소 맨 위 폴더에서):  python ml/train.py --source fake [--activate]
+                               python ml/train.py --source db --auto
 """
 from __future__ import annotations
 
@@ -79,15 +82,15 @@ def split_by_date(df: pd.DataFrame, test_days: int) -> tuple[pd.DataFrame, pd.Da
 
 
 def baseline_predict(train: pd.DataFrame, test: pd.DataFrame, quantiles: list[float]) -> pd.DataFrame:
-    """(노선, 시간대)별 학습 기간 분위수. 그 조합이 학습에 없으면 노선 분위수, 그것도 없으면 전체 분위수"""
+    """(노선, 도착/출발, 시간대)별 학습 기간 분위수. 그 조합이 학습에 없으면 (노선, 도착/출발), 그것도 없으면 전체"""
     out = pd.DataFrame(index=test.index)
     for q in quantiles:
-        by_lh = train.groupby(["line_name", "hour"])["delay_min"].quantile(q)
-        by_l = train.groupby("line_name")["delay_min"].quantile(q)
+        by_leh = train.groupby(["line_name", "event", "hour"])["delay_min"].quantile(q)
+        by_le = train.groupby(["line_name", "event"])["delay_min"].quantile(q)
         overall = float(train["delay_min"].quantile(q))
-        keys = list(zip(test["line_name"], test["hour"]))
-        v = pd.Series([by_lh.get(k, np.nan) for k in keys], index=test.index)
-        v = v.fillna(test["line_name"].map(by_l)).fillna(overall)
+        v = pd.Series([by_leh.get(k, np.nan) for k in zip(test["line_name"], test["event"], test["hour"])], index=test.index)
+        v2 = pd.Series([by_le.get(k, np.nan) for k in zip(test["line_name"], test["event"])], index=test.index)
+        v = v.fillna(v2).fillna(overall)
         out["base_" + qcol(q)] = v.astype(float)
     return out
 
@@ -166,10 +169,42 @@ def save_and_register(res: TrainResult, version: str, metrics: dict, activate: b
     return path
 
 
+def current_active() -> dict | None:
+    """DB 의 지금 활성 모델 {version, data_source, bundle}. 없거나 파일이 없으면 None"""
+    rows = db.select("ml_models", columns="version,data_source,file_path", filters={"is_active": "eq.true"})
+    if not rows:
+        return None
+    path = BASE_DIR / rows[0]["file_path"]
+    if not path.exists():
+        return None
+    return {**rows[0], "bundle": joblib.load(path)}
+
+
+def decide_activation(res: TrainResult, metrics: dict) -> tuple[bool, str]:
+    """--auto: baseline 보다 낫고, 지금 활성 모델(실제 데이터)보다도 나을 때만 활성화. (활성화 여부, 이유)"""
+    m, b = metrics["brier_model"], metrics["brier_baseline"]
+    if m >= b:
+        return False, f"baseline 보다 낫지 않아 활성화하지 않았어요 (Brier 모델 {m:.4f} / baseline {b:.4f})"
+    cur = current_active()
+    if cur is None:
+        return True, f"baseline 보다 나아 활성화했어요 (Brier {m:.4f} < {b:.4f}). 지금 활성 모델은 없어요."
+    if cur["data_source"] == "fake":
+        return True, f"baseline 보다 나아 활성화했어요 (Brier {m:.4f} < {b:.4f}). 가짜 데이터 모델 {cur['version']} 을 바꿔요."
+    cmp = report.compare_brier(res, predict_frame(cur["bundle"], res.test), cur["bundle"]["quantiles"])
+    metrics["compare_active"] = {"version": cur["version"], **(cmp or {})}
+    if cmp is None:
+        return True, f"baseline 보다 나아 활성화했어요. 지금 모델 {cur['version']} 과 겹치는 시험 줄이 없어 baseline 으로만 비교했어요."
+    if cmp["brier_new"] <= cmp["brier_active"]:
+        return True, f"지금 모델 {cur['version']} 보다 나아 활성화했어요 (같은 시험 {cmp['rows']:,}줄 Brier {cmp['brier_new']:.4f} ≤ {cmp['brier_active']:.4f})"
+    return False, f"지금 모델 {cur['version']} 이 더 나아 그대로 둬요 (같은 시험 {cmp['rows']:,}줄 Brier {cmp['brier_new']:.4f} > {cmp['brier_active']:.4f})"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="지연 예측 분위수 모델 학습")
     ap.add_argument("--source", choices=dataset.SOURCES, required=True)
-    ap.add_argument("--activate", action="store_true", help="등록한 모델을 서버가 쓰는 활성 모델로 바꾼다 (기존 활성 모델은 꺼진다)")
+    how = ap.add_mutually_exclusive_group()
+    how.add_argument("--activate", action="store_true", help="등록한 모델을 서버가 쓰는 활성 모델로 바꾼다 (기존 활성 모델은 꺼진다)")
+    how.add_argument("--auto", action="store_true", help="baseline 과 지금 활성 모델보다 나을 때만 활성화 (매주 자동 학습용)")
     args = ap.parse_args()
     if args.source == "fake":
         print("※ 가짜 데이터로 학습해요. 결과 숫자는 흐름 확인용이고 실제 의미가 없어요.")
@@ -183,9 +218,15 @@ def main() -> None:
     print(f"리포트: {path}")
     print(f"  Brier 모델 {metrics['brier_model']:.4f} / baseline {metrics['brier_baseline']:.4f}")
 
-    path = save_and_register(res, version, metrics, args.activate)
+    activate = args.activate
+    if args.auto:
+        activate, why = decide_activation(res, metrics)
+        metrics["auto_decision"] = why
+        print("자동 판단: " + why)
+    path = save_and_register(res, version, metrics, activate)
     print(f"모델 저장·등록: {version} → {path}")
-    print("  활성화했어요. 서버를 다시 켜면 이 모델로 확률을 계산해요." if args.activate else "  활성화하지 않았어요. 쓰려면 --activate 를 붙여 다시 학습하거나 DB 함수 activate_ml_model 을 부르세요.")
+    print("  활성화했어요. 서버가 한 시간 안에 이 모델로 바꿔요 (바로 쓰려면 서버를 다시 켜세요)." if activate
+          else "  활성화하지 않았어요. 쓰려면 --activate 를 붙여 다시 학습하거나 DB 함수 activate_ml_model 을 부르세요.")
 
 
 if __name__ == "__main__":

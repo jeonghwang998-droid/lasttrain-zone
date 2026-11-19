@@ -82,8 +82,9 @@ def select(table: str, columns: str = "*", filters: dict | None = None, order: s
         start += PAGE_ROWS
 
 
-def upsert(table: str, rows: list[dict], on_conflict: str, batch: int = PAGE_ROWS, progress=None) -> int:
-    """rows 를 batch 개씩 넣는다. on_conflict 칸이 같은 줄은 덮어쓴다. 넣은 줄 수를 돌려준다"""
+def upsert(table: str, rows: list[dict], on_conflict: str, batch: int = PAGE_ROWS, progress=None, keep_existing: bool = False) -> int:
+    """rows 를 batch 개씩 넣는다. on_conflict 칸이 같은 줄은 덮어쓴다 (keep_existing 이면 먼저 있던 줄을 남긴다). 보낸 줄 수를 돌려준다"""
+    resolution = "ignore-duplicates" if keep_existing else "merge-duplicates"
     done = 0
     for i in range(0, len(rows), batch):
         chunk = rows[i : i + batch]
@@ -93,7 +94,7 @@ def upsert(table: str, rows: list[dict], on_conflict: str, batch: int = PAGE_ROW
                     f"{_base()}/{table}",
                     params={"on_conflict": on_conflict},
                     json=chunk,
-                    headers=_headers({"Prefer": "resolution=merge-duplicates,return=minimal"}),
+                    headers=_headers({"Prefer": f"resolution={resolution},return=minimal"}),
                     timeout=TIMEOUT_SEC,
                 )
                 break

@@ -101,6 +101,24 @@ def evaluate(res) -> dict:
     }
 
 
+def compare_brier(res, other_pred: pd.DataFrame, other_quantiles: list[float]) -> dict | None:
+    """같은 시험 줄·같은 사건으로 새 모델과 다른 모델(지금 활성 모델)의 Brier 점수를 잰다.
+    두 모델이 모두 예측한 줄만 쓴다. 그런 줄이 없으면 None"""
+    ok = (res.pred["level"] != "none") & (other_pred["level"] != "none")
+    if not ok.any():
+        return None
+    y = res.test.loc[ok, "delay_min"].to_numpy()
+    new_cols = {q: qcol(q) for q in res.policy.quantiles}
+    old_cols = {q: qcol(q) for q in other_quantiles}
+    p_new, p_old, hit = [], [], []
+    for s in _slack_grid(res.train, res.policy.quantiles):
+        p_new.append(_probs(res.pred.loc[ok], new_cols, s))
+        p_old.append(_probs(other_pred.loc[ok], old_cols, s))
+        hit.append((y <= s).astype(float))
+    p_new, p_old, hit = np.concatenate(p_new), np.concatenate(p_old), np.concatenate(hit)
+    return {"rows": int(ok.sum()), "brier_new": float(np.mean((p_new - hit) ** 2)), "brier_active": float(np.mean((p_old - hit) ** 2))}
+
+
 def _plot(metrics: dict, path: Path) -> None:
     import matplotlib
 

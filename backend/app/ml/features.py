@@ -1,9 +1,11 @@
 """지연 예측 특징 생성. 학습(ml/train.py)과 서빙(app/ml/delay_model.py)이 이 파일 하나만 쓴다
 
-입력 칸: line_name, station_key, hour, weekday  (ml/dataset.py 의 칸과 같은 이름)
+입력 칸: line_name, station_key, hour, weekday, (있으면) event  (ml/dataset.py 의 칸과 같은 이름)
 특징:
   hour      시간대 (21, 22, 23, 24=자정 넘은 0시, 25=1시 … 운행일 기준이라 밤이 이어진다)
   weekday   요일 0=월 … 6=일 (운행일 기준. 금·토 밤이 따로 갈리도록 나무 모델이 나눠 본다)
+  is_dep    출발 기록이면 1, 도착이면 0. 출발 지연은 문 닫히는 시간까지 더해져 도착보다 크다.
+            앱의 예측은 늘 도착 기준이라 event 칸 없이 부르면 0 (도착)
   line_*    노선 (원-핫)
   st_*      역 (원-핫). 기록이 넉넉한 역만 켠다. 모자란 역은 모두 0 → 노선 단위로 예측된다
 
@@ -43,7 +45,8 @@ def coarsen(df: pd.DataFrame, support: dict, min_samples: int) -> pd.DataFrame:
 
 def make_features(df: pd.DataFrame, columns: list[str] | None = None) -> pd.DataFrame:
     """columns 를 주면 그 칸 구성과 순서에 맞춘다 (예측할 때 학습 때와 같게). 처음 보는 노선·역은 모두 0"""
-    X = pd.DataFrame({"hour": df["hour"].astype(int), "weekday": df["weekday"].astype(int)}, index=df.index)
+    is_dep = (df["event"] == "dep").astype(int) if "event" in df else 0
+    X = pd.DataFrame({"hour": df["hour"].astype(int), "weekday": df["weekday"].astype(int), "is_dep": is_dep}, index=df.index)
     lines = pd.get_dummies(df["line_name"], prefix="line", dtype=int)
     stations = pd.get_dummies(df["station_key"].where(df["station_key"] != UNKNOWN), prefix="st", dtype=int)
     X = pd.concat([X, lines, stations], axis=1)

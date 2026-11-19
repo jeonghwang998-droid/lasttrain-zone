@@ -4,7 +4,7 @@
 -- 만드는 것
 --   1) app_config 정책값 (읽기는 이미 있는 config_value / config_int / config_real 함수로)
 --   2) train_timetable : KRIC 역 시간표 (backend/data/kric/timetable_*.json 을 올린다)
---   3) train_arrivals  : 실시간 도착정보 원본 (열차가 실제로 역에 도착한 시각)
+--   3) train_arrivals  : 실시간 열차 위치 원본 (열차가 실제로 역에 도착하거나 출발한 시각)
 --   4) train_delays    : 위 둘을 맞춘 뷰 → 지연(분), 시간대, 요일
 --   5) ml_models       : 학습한 모델 기록 (활성 모델은 하나만) + 활성화 함수
 -- 모두 백엔드 전용이다: RLS 를 켜고 정책을 두지 않으며 anon/authenticated 권한을 회수한다.
@@ -52,27 +52,35 @@ CREATE TABLE IF NOT EXISTS public.train_timetable (
 
 
 -- =========================================================
--- 3. 실시간 도착정보 원본. 수집기가 역과 열차번호를 시간표 형식(station_key, train_no)으로 맞춰서 넣는다
---    (원본 API 의 값은 raw_* 에 그대로 남긴다. 같은 열차의 같은 도착은 한 번만)
+-- 3. 실시간 열차 위치 원본. 수집기가 역과 열차번호를 시간표 형식(station_key, train_no)으로 맞춰서 넣는다
+--    (원본 API 의 값은 raw_* 에 그대로 남긴다. 같은 열차·역·운행일의 도착과 출발은 각각 한 번만)
 -- =========================================================
 CREATE TABLE IF NOT EXISTS public.train_arrivals (
   id             bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  service_date   date        NOT NULL,  -- 운행일 (새벽 5시 전 도착은 전날 운행)
+  service_date   date        NOT NULL,  -- 운행일 (새벽 4시 전 기록은 전날 운행, backend/app/core/subway.py SERVICE_DAY_START)
   train_no       text        NOT NULL,  -- 시간표와 같은 형식의 열차번호
   station_key    text        NOT NULL,  -- 시간표와 같은 형식의 역 키
   direction      text,                  -- 상행/하행, 내선/외선 (원본 그대로)
-  arrived_at     timestamptz NOT NULL,  -- 실제 도착 시각
+  arrived_at     timestamptz NOT NULL,  -- 실제 시각 (event 가 'dep' 이면 출발 시각)
   source         text        NOT NULL,  -- 출처 (예: 'seoul_realtime')
   raw_train_no   text,                  -- 원본 열차번호
   raw_station_id text,                  -- 원본 역 id
   collected_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (service_date, train_no, station_key)
+  event          text        NOT NULL DEFAULT 'arr' CHECK (event IN ('arr', 'dep'))  -- 'arr' 도착, 'dep' 출발
 );
 CREATE INDEX IF NOT EXISTS train_arrivals_date_idx ON public.train_arrivals (service_date);
 
+-- 이미 만든 표 고치기 (출발 기록 추가, 2026-11-19): event 칸을 더하고 중복 기준에 event 를 넣는다
+ALTER TABLE public.train_arrivals
+  ADD COLUMN IF NOT EXISTS event text NOT NULL DEFAULT 'arr' CHECK (event IN ('arr', 'dep'));
+ALTER TABLE public.train_arrivals
+  DROP CONSTRAINT IF EXISTS train_arrivals_service_date_train_no_station_key_key;
+CREATE UNIQUE INDEX IF NOT EXISTS train_arrivals_one_event
+  ON public.train_arrivals (service_date, train_no, station_key, event);
+
 
 -- =========================================================
--- 4. 지연 뷰: 실제 도착 − 시간표 도착 (같은 열차번호, 같은 역, 같은 운행일의 요일 시간표)
+-- 4. 지연 뷰: 실제 시각 − 시간표 시각 (도착은 도착 예정, 출발은 출발 예정과. 같은 열차번호, 같은 역, 같은 운행일의 요일 시간표)
 --    토·일은 휴일 시간표('9'), 나머지는 평일('8'). 공휴일은 아직 구분하지 않는다 (평일로 잡힘)
 --    지연이 ml.delay_valid_range 밖이면 뺀다
 -- =========================================================
@@ -87,7 +95,9 @@ WITH m AS (
     t.tago_id,
     t.line_name,
     t.station_name,
-    COALESCE(t.arr_min, t.dep_min) AS scheduled_min,
+    a.event,
+    CASE WHEN a.event = 'dep' THEN COALESCE(t.dep_min, t.arr_min)
+         ELSE COALESCE(t.arr_min, t.dep_min) END AS scheduled_min,
     EXTRACT(EPOCH FROM (a.arrived_at - (a.service_date::timestamp AT TIME ZONE 'Asia/Seoul'))) / 60.0 AS actual_min
   FROM public.train_arrivals a
   JOIN public.train_timetable t
@@ -107,7 +117,8 @@ SELECT
   scheduled_min,
   ROUND((actual_min - scheduled_min)::numeric, 1)::double precision AS delay_min,
   (scheduled_min / 60)::integer                                     AS hour,     -- 24, 25 는 자정 넘은 0시, 1시
-  (EXTRACT(ISODOW FROM service_date)::integer - 1)                  AS weekday   -- 0=월 … 6=일 (운행일 기준)
+  (EXTRACT(ISODOW FROM service_date)::integer - 1)                  AS weekday,  -- 0=월 … 6=일 (운행일 기준)
+  event                                                             -- 'arr' 도착 / 'dep' 출발 (뷰 맨 끝에 더한 칸)
 FROM m
 WHERE scheduled_min IS NOT NULL
   AND actual_min - scheduled_min BETWEEN (public.config_value('ml.delay_valid_range') ->> 'min')::double precision

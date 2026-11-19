@@ -7,12 +7,14 @@
 
 - predict_frame(bundle, df) : 여러 줄을 한 번에 예측 → 분위수별 예측 지연(분)과 예측 단위(station/line/none)
 - load_active()             : 서버 시작 때 DB ml_models 의 활성 모델을 불러온다. 없거나 실패해도 서버는 정상 (확률만 null)
+- start_loading()           : 뒤에서 불러오고, 그 뒤 RELOAD_CHECK_SEC 마다 활성 모델이 바뀌었는지 보고 다시 불러온다
 - DelayModel.leg / .route   : 환승 구간마다 막차 확률, 등급, 예상 지연(q50), 위험 지연(q90), 가장 큰 요인 한 줄
 """
 from __future__ import annotations
 
 import logging
 import threading
+import time
 from pathlib import Path
 
 import joblib
@@ -29,6 +31,7 @@ log = logging.getLogger(__name__)
 EXPECTED_LEVEL = 0.5
 RISK_LEVEL = 0.9
 WEEKDAYS = "월화수목금토일"
+RELOAD_CHECK_SEC = 3600  # 활성 모델이 바뀌었는지 보는 간격 (매주 자동 학습이 새 모델을 켜면 서버를 다시 켜지 않아도 바뀐다)
 
 
 def qcol(q: float) -> str:
@@ -181,6 +184,28 @@ def load_active() -> None:
         log.info("[delay_model] %s", _status)
 
 
+def active_version_changed() -> bool:
+    """DB 의 활성 모델 버전이 지금 불러온 것과 다른가. DB 를 못 읽으면 False (지금 모델을 그대로 쓴다)"""
+    from ..services import db
+
+    try:
+        rows = db.select("ml_models", columns="version", filters={"is_active": "eq.true"})
+    except Exception as e:
+        log.warning("[delay_model] 활성 모델 확인 실패: %s", type(e).__name__)
+        return False
+    want = rows[0]["version"] if rows else None
+    have = _active.version if _active else None
+    return want != have
+
+
+def _load_and_watch() -> None:
+    load_active()
+    while True:
+        time.sleep(RELOAD_CHECK_SEC)
+        if active_version_changed():
+            load_active()
+
+
 def start_loading() -> None:
-    """서버 시작을 막지 않도록 뒤에서 불러온다 (DB 가 느려도 서버는 바로 뜬다)"""
-    threading.Thread(target=load_active, name="delay-model-load", daemon=True).start()
+    """서버 시작을 막지 않도록 뒤에서 불러온다 (DB 가 느려도 서버는 바로 뜬다). 그 뒤로 활성 모델이 바뀌면 다시 불러온다"""
+    threading.Thread(target=_load_and_watch, name="delay-model-load", daemon=True).start()
